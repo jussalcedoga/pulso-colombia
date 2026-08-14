@@ -1,5 +1,7 @@
 # Pulso Colombia
 
+[![CI](https://github.com/jussalcedoga/pulso-colombia/actions/workflows/ci.yml/badge.svg)](https://github.com/jussalcedoga/pulso-colombia/actions/workflows/ci.yml)
+
 <p align="center">
   <a href="https://pulso-colombia.juan-sebastian-salcedo-gallo-th.workers.dev">
     <img src="public/pulso-logo.svg" width="420" alt="Open Pulso Colombia" />
