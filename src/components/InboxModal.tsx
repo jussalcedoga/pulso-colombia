@@ -35,6 +35,10 @@ import type {
 import { Modal } from "./Modal";
 import { OfferIcon } from "./NeedIcon";
 
+const ACTIVE_CHAT_POLL_MS = 4_000;
+const IDLE_CHAT_POLL_MS = 20_000;
+const ACTIVE_CHAT_POLL_COUNT = 8;
+
 interface InboxModalProps {
   t: TFunction;
   language: Language;
@@ -109,6 +113,9 @@ export function InboxModal({
   const [chatLoading, setChatLoading] = useState(false);
   const [error, setError] = useState("");
   const lastMessageIds = useRef<Record<string, number>>({});
+  const chatLoadsInFlight = useRef<Set<string>>(new Set());
+  const activeChatPollsRemaining = useRef(ACTIVE_CHAT_POLL_COUNT);
+  const wakeChatPollingRef = useRef<(() => void) | null>(null);
   const handledInitialOfferId = useRef<string | null>(null);
   const messageListRef = useRef<HTMLDivElement | null>(null);
 
@@ -131,6 +138,8 @@ export function InboxModal({
 
   const loadChat = useCallback(
     async (offerId: string, quiet = false) => {
+      if (chatLoadsInFlight.current.has(offerId)) return 0;
+      chatLoadsInFlight.current.add(offerId);
       if (!quiet) setChatLoading(true);
       try {
         const after = lastMessageIds.current[offerId] ?? 0;
@@ -153,13 +162,16 @@ export function InboxModal({
           );
           if (result.messages.some((message) => !message.mine)) onRead(offerId);
         }
+        return result.messages.length;
       } catch (caught) {
         if (!quiet) {
           setError(
             caught instanceof ApiRequestError ? caught.message : t("genericError")
           );
         }
+        return 0;
       } finally {
+        chatLoadsInFlight.current.delete(offerId);
         if (!quiet) setChatLoading(false);
       }
     },
@@ -184,20 +196,86 @@ export function InboxModal({
   }, [offers, selectedOfferId]);
 
   useEffect(() => {
-    if (!selectedOffer?.canChat) return;
-    void loadChat(selectedOffer.id);
-    const refreshVisibleChat = () => {
-      if (document.visibilityState === "visible") {
-        void loadChat(selectedOffer.id, true);
+    if (!selectedOffer?.canChat) {
+      wakeChatPollingRef.current = null;
+      return;
+    }
+
+    let disposed = false;
+    let timer: number | null = null;
+    let timerDueAt = 0;
+
+    const clearTimer = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = null;
+      timerDueAt = 0;
+    };
+
+    const schedule = (delay: number) => {
+      if (disposed || document.visibilityState !== "visible") return;
+      clearTimer();
+      timerDueAt = Date.now() + delay;
+      timer = window.setTimeout(() => {
+        timer = null;
+        timerDueAt = 0;
+        void refresh(true);
+      }, delay);
+    };
+
+    const refresh = async (quiet: boolean) => {
+      if (disposed || document.visibilityState !== "visible") return;
+      if (activeChatPollsRemaining.current > 0) {
+        activeChatPollsRemaining.current -= 1;
+      }
+      const messageCount = await loadChat(selectedOffer.id, quiet);
+      if (disposed) return;
+      if (messageCount > 0) {
+        activeChatPollsRemaining.current = ACTIVE_CHAT_POLL_COUNT;
+      }
+      schedule(
+        activeChatPollsRemaining.current > 0
+          ? ACTIVE_CHAT_POLL_MS
+          : IDLE_CHAT_POLL_MS
+      );
+    };
+
+    const wakePolling = () => {
+      activeChatPollsRemaining.current = ACTIVE_CHAT_POLL_COUNT;
+      if (document.visibilityState !== "visible") return;
+      const nextActivePollAt = Date.now() + ACTIVE_CHAT_POLL_MS;
+      if (!timer || timerDueAt > nextActivePollAt) {
+        schedule(ACTIVE_CHAT_POLL_MS);
       }
     };
-    const timer = window.setInterval(refreshVisibleChat, 20_000);
-    document.addEventListener("visibilitychange", refreshVisibleChat);
-    window.addEventListener("focus", refreshVisibleChat);
+
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== "visible") {
+        clearTimer();
+        return;
+      }
+      activeChatPollsRemaining.current = ACTIVE_CHAT_POLL_COUNT;
+      clearTimer();
+      void refresh(true);
+    };
+
+    activeChatPollsRemaining.current = ACTIVE_CHAT_POLL_COUNT;
+    wakeChatPollingRef.current = wakePolling;
+    void refresh(false);
+    window.addEventListener("pointerdown", wakePolling, { passive: true });
+    window.addEventListener("keydown", wakePolling);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    window.addEventListener("focus", refreshOnReturn);
+
     return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", refreshVisibleChat);
-      window.removeEventListener("focus", refreshVisibleChat);
+      disposed = true;
+      clearTimer();
+      if (wakeChatPollingRef.current === wakePolling) {
+        wakeChatPollingRef.current = null;
+      }
+      window.removeEventListener("pointerdown", wakePolling);
+      window.removeEventListener("keydown", wakePolling);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+      window.removeEventListener("focus", refreshOnReturn);
     };
   }, [loadChat, selectedOffer?.canChat, selectedOffer?.id]);
 
@@ -236,6 +314,8 @@ export function InboxModal({
         result.message.id
       );
       setChatDrafts((current) => ({ ...current, [offerId]: "" }));
+      activeChatPollsRemaining.current = ACTIVE_CHAT_POLL_COUNT;
+      wakeChatPollingRef.current?.();
     } catch (caught) {
       setError(
         caught instanceof ApiRequestError ? caught.message : t("genericError")

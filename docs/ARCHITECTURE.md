@@ -64,12 +64,13 @@ read receipts per message. Opening a conversation atomically advances that
 participant's read sequence.
 
 The responsive inbox keeps only one conversation thread active. It includes the
-opening private message in the transcript, requests only messages newer than
-the latest local message every 20 seconds, and refreshes immediately when the
-browser regains focus. Opening the inbox always requests a fresh `no-store`
-response. Recovery codes identify accounts across devices; equal display names
-do not share an inbox. The moderator cannot read a conversation unless that
-account is a participant.
+opening private message in the transcript and requests only messages newer than
+the latest local message. Polling runs every four seconds while the user is
+actively interacting with the chat, backs off to 20 seconds after inactivity,
+stops in hidden tabs, and refreshes immediately when the browser regains focus.
+Opening the inbox always requests a fresh `no-store` response. Recovery codes
+identify accounts across devices; equal display names do not share an inbox.
+The moderator cannot read a conversation unless that account is a participant.
 
 Every visible post also has a public text discussion. Anyone may read it;
 posting requires an account. Resolved posts and their discussions leave public

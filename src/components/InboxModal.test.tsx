@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTranslator } from "../i18n";
 import type { Offer, User } from "../types";
@@ -99,7 +106,10 @@ function renderInbox(offers: Offer[], initialOfferId: string) {
 }
 
 describe("private conversations", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -170,5 +180,22 @@ describe("private conversations", () => {
       )
     );
     expect(onChanged).toHaveBeenCalledWith("Accepted");
+  });
+
+  it("checks an active conversation again after four seconds", async () => {
+    vi.useFakeTimers();
+    const offer = directConversation();
+    renderInbox([offer], offer.id);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(apiMocks.chatMessages).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000);
+    });
+    expect(apiMocks.chatMessages).toHaveBeenCalledTimes(2);
   });
 });
