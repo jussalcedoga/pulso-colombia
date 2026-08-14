@@ -113,6 +113,12 @@ export const OFFICIAL_RESOURCES = [
 
 export const OFFICIAL_INFORMATION = [
   {
+    id: "copernicus",
+    name: "Copernicus EMSR916",
+    url: "https://mapping.emergency.copernicus.eu/activations/EMSR916/",
+    domain: "mapping.emergency.copernicus.eu"
+  },
+  {
     id: "ungrd",
     name: "UNGRD Colombia",
     url: "https://portal.gestiondelriesgo.gov.co/",

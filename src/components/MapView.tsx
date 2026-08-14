@@ -1,9 +1,7 @@
 import { cellToBoundary } from "h3-js";
 import L, { type LatLngExpression, type Map as LeafletMap } from "leaflet";
 import {
-  CalendarDays,
   CircleAlert,
-  Crosshair,
   ExternalLink,
   HeartHandshake,
   Layers3,
@@ -12,16 +10,13 @@ import {
   Minus,
   Plus,
   Satellite,
-  ShieldCheck,
   X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  CircleMarker,
   MapContainer,
   Marker,
   Polygon,
-  Rectangle,
   TileLayer,
   Tooltip,
   useMap
@@ -29,38 +24,22 @@ import {
 import { CITIES, cityDefinition } from "../data";
 import type { TFunction } from "../i18n";
 import { scoreColor, summarizeCells } from "../scoring";
-import type {
-  CityId,
-  DamageClassification,
-  HazardResponse,
-  Language,
-  NeedType,
-  Report
-} from "../types";
+import type { CityId, NeedType, Report } from "../types";
 
 export interface MapLayers {
   base: "imagery" | "streets";
-  nasa: boolean;
-  modeled: boolean;
-  observed: boolean;
-  officialDamage: boolean;
   reports: boolean;
-  aftershocks: boolean;
 }
 
 interface MapViewProps {
   t: TFunction;
-  language: Language;
   selectedCity: CityId;
   reports: Report[];
-  hazards: HazardResponse | null;
   selectedReportId: string | null;
   focusedLocation: [number, number] | null;
   layers: MapLayers;
-  satelliteDate: string;
   onCityChange: (city: CityId) => void;
   onLayersChange: (layers: MapLayers) => void;
-  onSatelliteDateChange: (date: string) => void;
   onReportSelect: (report: Report) => void;
   onLocationError: () => void;
   onNeedHelp: () => void;
@@ -86,19 +65,19 @@ function MapController({
 
   useEffect(() => {
     const city = cityDefinition(selectedCity);
-    map.flyTo(city.center, city.zoom, { duration: 0.6 });
+    map.flyTo(city.center, city.zoom, { duration: 0.45 });
   }, [map, selectedCity]);
 
   useEffect(() => {
     if (selectedReport) {
       map.flyTo([selectedReport.latitude, selectedReport.longitude], 17, {
-        duration: 0.55
+        duration: 0.45
       });
     }
   }, [map, selectedReport]);
 
   useEffect(() => {
-    if (focusedLocation) map.flyTo(focusedLocation, 16, { duration: 0.55 });
+    if (focusedLocation) map.flyTo(focusedLocation, 16, { duration: 0.45 });
   }, [focusedLocation, map]);
 
   return null;
@@ -108,13 +87,13 @@ function markerSymbol(report: Report): string {
   if (report.postType === "offer") return "+";
   if (report.postType === "update") return "i";
   const symbols: Record<NeedType, string> = {
-    water: "💧",
-    food: "●",
-    shelter: "⌂",
+    water: "W",
+    food: "F",
+    shelter: "H",
     medical: "+",
-    hygiene: "✦",
+    hygiene: "C",
     rescue: "!",
-    transport: "↗",
+    transport: "T",
     information: "i",
     funds: "$"
   };
@@ -142,20 +121,6 @@ function reportMarker(report: Report, selected: boolean): L.DivIcon {
   });
 }
 
-function mmiColor(mmi: number): string {
-  if (mmi >= 8) return "#bf1e2e";
-  if (mmi >= 7) return "#e64b2e";
-  if (mmi >= 6) return "#ed8b2f";
-  if (mmi >= 5) return "#d4ad28";
-  return "#4b9166";
-}
-
-function damageColor(classification: DamageClassification): string {
-  if (classification === "destroyed") return "#ff0000";
-  if (classification === "damaged") return "#e69800";
-  return "#e4cc00";
-}
-
 function needSummary(report: Report, t: TFunction): string {
   const labels: Record<NeedType, Parameters<TFunction>[0]> = {
     water: "needWater",
@@ -176,17 +141,13 @@ function needSummary(report: Report, t: TFunction): string {
 
 export function MapView({
   t,
-  language,
   selectedCity,
   reports,
-  hazards,
   selectedReportId,
   focusedLocation,
   layers,
-  satelliteDate,
   onCityChange,
   onLayersChange,
-  onSatelliteDateChange,
   onReportSelect,
   onLocationError,
   onNeedHelp,
@@ -198,29 +159,7 @@ export function MapView({
   const selectedReport =
     reports.find((report) => report.id === selectedReportId) ?? null;
   const city = cityDefinition(selectedCity);
-  const cityHazard = hazards?.cities.find((item) => item.id === selectedCity);
-  const officialAreas =
-    hazards?.copernicus.areas.filter((area) => area.city === selectedCity) ?? [];
-  const officialDamageCount = officialAreas.reduce(
-    (sum, area) => sum + area.damagePoints.length,
-    0
-  );
-  const officialRoadCount = officialAreas.reduce(
-    (sum, area) => sum + area.roadBlocks.length,
-    0
-  );
-  const modeledCells =
-    hazards?.shakemap.modeledCells.filter((cell) => cell.city === selectedCity) ?? [];
-  const observedCells =
-    hazards?.dyfi.cells.filter((cell) => cell.city === selectedCity) ?? [];
-  const cells = useMemo(
-    () => summarizeCells(reports, modeledCells),
-    [modeledCells, reports]
-  );
-  const satelliteUrl =
-    `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/` +
-    `VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${satelliteDate}/` +
-    "GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg";
+  const cells = useMemo(() => summarizeCells(reports), [reports]);
 
   const locate = () => {
     if (!navigator.geolocation) {
@@ -233,7 +172,7 @@ export function MapView({
         mapRef.current?.flyTo(
           [position.coords.latitude, position.coords.longitude],
           17,
-          { duration: 0.55 }
+          { duration: 0.45 }
         );
         setLocating(false);
       },
@@ -272,31 +211,10 @@ export function MapView({
             maxZoom={19}
           />
         ) : (
-          <TileLayer
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            attribution="Imagery &copy; Esri and contributors"
-            maxNativeZoom={19}
-            maxZoom={20}
-          />
-        )}
-
-        {layers.nasa && satelliteDate ? (
-          <TileLayer
-            key={satelliteDate}
-            url={satelliteUrl}
-            attribution="NASA EOSDIS GIBS"
-            maxNativeZoom={hazards?.satellite.maxNativeZoom ?? 9}
-            maxZoom={20}
-            opacity={0.58}
-            noWrap
-          />
-        ) : null}
-
-        {layers.base === "imagery" || layers.nasa ? (
           <>
             <TileLayer
-              url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
-              attribution="Reference &copy; Esri"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              attribution="Imagery &copy; Esri and contributors"
               maxNativeZoom={19}
               maxZoom={20}
             />
@@ -307,147 +225,7 @@ export function MapView({
               maxZoom={20}
             />
           </>
-        ) : null}
-
-        {layers.modeled
-          ? modeledCells.map((cell) => (
-              <Rectangle
-                key={cell.id}
-                bounds={[
-                  [cell.bounds[0], cell.bounds[1]],
-                  [cell.bounds[2], cell.bounds[3]]
-                ]}
-                pathOptions={{
-                  color: mmiColor(cell.mmi),
-                  fillColor: mmiColor(cell.mmi),
-                  fillOpacity: 0.11,
-                  opacity: 0.65,
-                  weight: 1
-                }}
-              >
-                <Tooltip sticky>
-                  <strong>{t("modeledMmi", { value: cell.mmi })}</strong>
-                  <br />
-                  {t("modelCellResolution", {
-                    value: hazards?.shakemap.resolutionKm ?? 1
-                  })}
-                  <br />
-                  {t("notObservedDamage")}
-                </Tooltip>
-              </Rectangle>
-            ))
-          : null}
-
-        {layers.observed
-          ? observedCells.map((cell) => (
-              <Rectangle
-                key={cell.id}
-                bounds={[
-                  [cell.bounds[0], cell.bounds[1]],
-                  [cell.bounds[2], cell.bounds[3]]
-                ]}
-                pathOptions={{
-                  color: "#2c6f99",
-                  fillColor: "#69a8cb",
-                  fillOpacity: 0.08,
-                  opacity: 0.9,
-                  dashArray: "5 4",
-                  weight: 1.5
-                }}
-              >
-                <Tooltip sticky>
-                  <strong>{t("observedCdi", { value: cell.cdi })}</strong>
-                  <br />
-                  {t("dyfiResponses", { count: cell.responses })}
-                  <br />
-                  {t("feltNotDamage")}
-                </Tooltip>
-              </Rectangle>
-            ))
-          : null}
-
-        {layers.officialDamage
-          ? officialAreas.map((area) => (
-              <Polygon
-                key={area.id}
-                positions={area.boundary as LatLngExpression[]}
-                pathOptions={{
-                  color: "#136886",
-                  fillOpacity: 0,
-                  opacity: 0.9,
-                  dashArray: "7 5",
-                  weight: 2
-                }}
-              >
-                <Tooltip sticky>
-                  <strong>{t("officialMappedArea")}: {area.name}</strong>
-                  <br />
-                  {t("copernicusAcquisition", {
-                    sensor: area.sensor ?? "VHR",
-                    date: new Date(area.acquisitionAt ?? area.deliveredAt).toLocaleDateString(
-                      language
-                    )
-                  })}
-                </Tooltip>
-              </Polygon>
-            ))
-          : null}
-
-        {layers.officialDamage
-          ? officialAreas.flatMap((area) =>
-              area.damagePoints.map((point) => (
-                <CircleMarker
-                  key={point.id}
-                  center={[point.latitude, point.longitude]}
-                  radius={5}
-                  pathOptions={{
-                    color: point.classification === "possibly_damaged" ? "#665d00" : "#ffffff",
-                    fillColor: damageColor(point.classification),
-                    fillOpacity: 0.95,
-                    weight: 1.5
-                  }}
-                >
-                  <Tooltip>
-                    <strong>
-                      {point.classification === "destroyed"
-                        ? t("destroyedBuilding")
-                        : point.classification === "damaged"
-                          ? t("damagedBuilding")
-                          : t("possiblyDamagedBuilding")}
-                    </strong>
-                    <br />
-                    {t("copernicusPhotoInterpretation")}
-                    <br />
-                    {area.name} · {hazards?.copernicus.activationCode}
-                  </Tooltip>
-                </CircleMarker>
-              ))
-            )
-          : null}
-
-        {layers.officialDamage
-          ? officialAreas.flatMap((area) =>
-              area.roadBlocks.map((road) => (
-                <CircleMarker
-                  key={road.id}
-                  center={[road.latitude, road.longitude]}
-                  radius={6}
-                  pathOptions={{
-                    color: "#ffffff",
-                    fillColor: "#20272c",
-                    fillOpacity: 1,
-                    weight: 2
-                  }}
-                >
-                  <Tooltip>
-                    <strong>{t("blockedRoad")}</strong>
-                    <br />
-                    {t("copernicusPhotoInterpretation")}
-                  </Tooltip>
-                </CircleMarker>
-              ))
-            )
-          : null}
+        )}
 
         {layers.reports
           ? cells.map((cell) => {
@@ -471,11 +249,7 @@ export function MapView({
                   }
                 >
                   <Tooltip sticky>
-                    <strong>{t("communityPriority")}</strong>
-                    <br />
-                    {cell.mmi != null
-                      ? t("modeledMmi", { value: cell.mmi })
-                      : t("noOfficialMmi")}
+                    <strong>{t("communityReports")}</strong>
                     <br />
                     {cell.reportCount === 1
                       ? t("oneReport")
@@ -485,45 +259,6 @@ export function MapView({
               );
             })
           : null}
-
-        {layers.aftershocks
-          ? hazards?.aftershocks.map((event) => (
-              <CircleMarker
-                key={event.id}
-                center={[event.latitude, event.longitude]}
-                radius={Math.max(4, (event.magnitude - 2.5) * 2.5)}
-                pathOptions={{
-                  color: "#1b2730",
-                  fillColor: "#f3c44f",
-                  fillOpacity: 0.78,
-                  weight: 1.5
-                }}
-              >
-                <Tooltip>
-                  M {event.magnitude.toFixed(1)} · {event.place}
-                </Tooltip>
-              </CircleMarker>
-            ))
-          : null}
-
-        {hazards ? (
-          <CircleMarker
-            center={[hazards.event.latitude, hazards.event.longitude]}
-            radius={10}
-            pathOptions={{
-              color: "#ffffff",
-              fillColor: "#d92f3d",
-              fillOpacity: 1,
-              weight: 3
-            }}
-          >
-            <Tooltip>
-              <strong>M {hazards.event.magnitude.toFixed(1)}</strong>
-              <br />
-              {hazards.event.place}
-            </Tooltip>
-          </CircleMarker>
-        ) : null}
 
         {layers.reports
           ? reports
@@ -559,7 +294,7 @@ export function MapView({
         >
           {CITIES.map((item) => (
             <option key={item.id} value={item.id}>
-              {language === "es" ? item.name : item.nameEn}
+              {item.name}
             </option>
           ))}
         </select>
@@ -611,15 +346,6 @@ export function MapView({
       <div className="map-style-switch" role="group" aria-label={t("baseMap")}>
         <button
           type="button"
-          className={layers.base === "imagery" ? "is-active" : ""}
-          onClick={() => onLayersChange({ ...layers, base: "imagery" })}
-          aria-pressed={layers.base === "imagery"}
-        >
-          <Satellite size={16} aria-hidden="true" />
-          {t("referenceImagery")}
-        </button>
-        <button
-          type="button"
           className={layers.base === "streets" ? "is-active" : ""}
           onClick={() => onLayersChange({ ...layers, base: "streets" })}
           aria-pressed={layers.base === "streets"}
@@ -627,38 +353,26 @@ export function MapView({
           <MapPinned size={16} aria-hidden="true" />
           {t("streetMap")}
         </button>
+        <button
+          type="button"
+          className={layers.base === "imagery" ? "is-active" : ""}
+          onClick={() => onLayersChange({ ...layers, base: "imagery" })}
+          aria-pressed={layers.base === "imagery"}
+        >
+          <Satellite size={16} aria-hidden="true" />
+          {t("referenceImagery")}
+        </button>
       </div>
 
-      <div className="map-evidence-strip">
-        <span className="evidence-strip__source">
-          <ShieldCheck size={16} aria-hidden="true" />
-          {officialDamageCount
-            ? t("officialDamageFindings", { count: officialDamageCount })
-            : t("officialMappingPending")}
-        </span>
-        <span>
-          {cityHazard?.mmi != null
-            ? t("modeledMmi", { value: cityHazard.mmi })
-            : t("noOfficialMmi")}
-        </span>
-        <span>
-          {cityHazard?.dyfiResponses
-            ? t("dyfiResponses", { count: cityHazard.dyfiResponses })
-            : t("noDyfiResponses")}
-        </span>
-        {officialRoadCount ? (
-          <span>{t("blockedRoadsCount", { count: officialRoadCount })}</span>
-        ) : null}
-        <a
-          href={hazards?.copernicus.activationUrl ?? CEMS_ACTIVATION_URL}
-          target="_blank"
-          rel="noreferrer"
-          title={t("openOfficialSource")}
-        >
-          {hazards?.copernicus.activationCode ?? "EMSR916"}
-          <ExternalLink size={13} aria-hidden="true" />
-        </a>
-      </div>
+      <a
+        className="map-evidence-strip map-reference-link"
+        href={CEMS_ACTIVATION_URL}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {t("officialMapReference")}
+        <ExternalLink size={14} aria-hidden="true" />
+      </a>
 
       {layersOpen ? (
         <div className="layer-panel">
@@ -677,17 +391,7 @@ export function MapView({
             </button>
           </header>
           <label className="toggle-row">
-            <span><ShieldCheck size={17} aria-hidden="true" />{t("officialDamageLayer")}</span>
-            <input
-              type="checkbox"
-              checked={layers.officialDamage}
-              onChange={(event) =>
-                onLayersChange({ ...layers, officialDamage: event.target.checked })
-              }
-            />
-          </label>
-          <label className="toggle-row">
-            <span>{t("communityNeeds")}</span>
+            <span>{t("communityReports")}</span>
             <input
               type="checkbox"
               checked={layers.reports}
@@ -696,61 +400,15 @@ export function MapView({
               }
             />
           </label>
-          <label className="toggle-row">
-            <span>{t("observedShaking")}</span>
-            <input
-              type="checkbox"
-              checked={layers.observed}
-              onChange={(event) =>
-                onLayersChange({ ...layers, observed: event.target.checked })
-              }
-            />
-          </label>
-          <label className="toggle-row">
-            <span>{t("modeledShaking")}</span>
-            <input
-              type="checkbox"
-              checked={layers.modeled}
-              onChange={(event) =>
-                onLayersChange({ ...layers, modeled: event.target.checked })
-              }
-            />
-          </label>
-          <label className="toggle-row">
-            <span><Satellite size={17} aria-hidden="true" />{t("nasaDailyImagery")}</span>
-            <input
-              type="checkbox"
-              checked={layers.nasa}
-              onChange={(event) =>
-                onLayersChange({ ...layers, nasa: event.target.checked })
-              }
-            />
-          </label>
-          {layers.nasa ? (
-            <label className="layer-date">
-              <span><CalendarDays size={16} aria-hidden="true" />{t("satelliteDate")}</span>
-              <input
-                type="date"
-                min={hazards?.satellite.eventDate}
-                max={hazards?.satellite.latestSuggestedDate}
-                value={satelliteDate}
-                onChange={(event) => onSatelliteDateChange(event.target.value)}
-              />
-            </label>
-          ) : null}
-          <label className="toggle-row">
-            <span>{t("aftershocks")}</span>
-            <input
-              type="checkbox"
-              checked={layers.aftershocks}
-              onChange={(event) =>
-                onLayersChange({ ...layers, aftershocks: event.target.checked })
-              }
-            />
-          </label>
-          <p>
-            {layers.nasa ? t("satelliteResolution") : t("layerEvidenceNote")}
-          </p>
+          <a
+            className="layer-reference-link"
+            href={CEMS_ACTIVATION_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {t("officialMapReference")}
+            <ExternalLink size={14} aria-hidden="true" />
+          </a>
         </div>
       ) : null}
 

@@ -29,8 +29,8 @@ community posts and targeted, private aid coordination.
 > Pulso is a community pilot, not an emergency service or structural inspection.
 > Call local emergency services when immediate life safety is at risk.
 
-The first screen is the working product: live map, current event, neighborhood
-needs, priority ranking, and separate **Necesito ayuda / I need help** and
+The first screen is the working community app: a fast street map, neighborhood
+posts, and separate **Necesito ayuda / I need help** and
 **Quiero ayudar / I want to help** paths.
 
 ## What The MVP Does

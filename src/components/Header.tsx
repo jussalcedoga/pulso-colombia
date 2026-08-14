@@ -62,9 +62,9 @@ export function Header({
             <span className="event-status__verified">{t("verifiedEvent")}</span>
           </a>
         ) : (
-          <span className="event-status event-status--loading">
+          <span className="event-status">
             <Radio size={15} aria-hidden="true" />
-            {t("eventFallback")}
+            {t("communityHubIntro")}
           </span>
         )}
 

@@ -8,10 +8,8 @@ import {
   MapPin,
   MapPinned,
   MessageSquarePlus,
-  Radio,
   ShieldCheck
 } from "lucide-react";
-import { useState } from "react";
 import { CITIES, NEED_TYPES, OFFICIAL_INFORMATION } from "../data";
 import { formatNumber, formatRelativeTime } from "../format";
 import type { TFunction } from "../i18n";
@@ -74,7 +72,6 @@ export function SidePanel({
   selectedPostType,
   tab,
   reports,
-  hazards,
   localAreas,
   onCityChange,
   onNeedChange,
@@ -87,91 +84,34 @@ export function SidePanel({
   onAreaFocus,
   onSources
 }: SidePanelProps) {
-  const [localEvidenceFilter, setLocalEvidenceFilter] = useState<
-    "all" | "official" | "community"
-  >("all");
   const openReports = reports.filter((report) => report.status === "open");
   const filteredReports = reports.filter(
     (report) =>
       (selectedPostType === "all" || report.postType === selectedPostType) &&
       (selectedNeed === "all" || report.needTypes.includes(selectedNeed))
   );
-  const selectedOfficialAreas =
-    hazards?.copernicus.areas.filter((area) => area.city === selectedCity) ?? [];
-  const officialPoints = selectedOfficialAreas.flatMap((area) => area.damagePoints);
-  const destroyedBuildings = officialPoints.filter(
-    (point) => point.classification === "destroyed"
-  ).length;
-  const damagedBuildings = officialPoints.filter(
-    (point) => point.classification === "damaged"
-  ).length;
-  const possiblyDamagedBuildings = officialPoints.filter(
-    (point) => point.classification === "possibly_damaged"
-  ).length;
-  const mappedRoadBlocks = selectedOfficialAreas.reduce(
-    (sum, area) => sum + area.roadBlocks.length,
+  const visibleLocalAreas = localAreas.filter((area) => area.openReports > 0);
+  const affectedPeople = visibleLocalAreas.reduce(
+    (sum, area) => sum + area.affectedPeople,
     0
   );
-  const visibleLocalAreas = localAreas.filter((area) => {
-    if (localEvidenceFilter === "official") {
-      return area.destroyed + area.damaged + area.possiblyDamaged + area.roadBlocks > 0;
-    }
-    if (localEvidenceFilter === "community") return area.openReports > 0;
-    return true;
-  });
 
   return (
     <aside className="side-panel" id="community-feed">
       <div className="event-summary">
         <div className="event-summary__topline">
           <span className="source-chip source-chip--official">
-            <ShieldCheck size={14} aria-hidden="true" />
-            {t("evidenceOfficial")}
+            <MapPin size={14} aria-hidden="true" />
+            {t("evidenceCommunity")}
           </span>
-          {hazards ? (
-            <span>{formatRelativeTime(hazards.source.updatedAt, language, t)}</span>
-          ) : null}
         </div>
-        {hazards ? (
-          <>
-            <div className="event-summary__main">
-              <span className="event-magnitude">M {hazards.event.magnitude.toFixed(1)}</span>
-              <div>
-                <strong>{hazards.event.place}</strong>
-                <span>{t("eventDepth", { value: Math.round(hazards.event.depthKm) })}</span>
-              </div>
-            </div>
-            <div className="event-summary__signals">
-              {hazards.event.alert === "red" ? (
-                <span className="signal signal--critical">
-                  <CircleAlert size={14} aria-hidden="true" /> {t("redAlert")}
-                </span>
-              ) : null}
-              {hazards.event.felt ? (
-                <span className="signal">
-                  <Radio size={14} aria-hidden="true" />
-                  {t("eventFelt", { count: formatNumber(hazards.event.felt, language) })}
-                </span>
-              ) : null}
-              {hazards.groundFailure?.landslideAlert ? (
-                <span className="signal">
-                  <CircleAlert size={14} aria-hidden="true" />
-                  {t("landslideAlert", { value: hazards.groundFailure.landslideAlert })}
-                </span>
-              ) : null}
-              {hazards.groundFailure?.liquefactionAlert ? (
-                <span className="signal">
-                  <CircleAlert size={14} aria-hidden="true" />
-                  {t("liquefactionAlert", {
-                    value: hazards.groundFailure.liquefactionAlert
-                  })}
-                </span>
-              ) : null}
-            </div>
-          </>
-        ) : (
-          <div className="event-summary__loading">{t("loading")}</div>
-        )}
+        <div className="event-summary__main">
+          <span className="event-magnitude">{openReports.length}</span>
+          <div>
+            <strong>{t("openNeeds", { count: openReports.length })}</strong>
+            <span>{t("communityHubIntro")}</span>
+          </div>
+        </div>
       </div>
 
       <div className="primary-actions">
@@ -394,62 +334,22 @@ export function SidePanel({
           <div className="method-note">
             <strong>{t("neighborhoodEvidence")}</strong>
             <p>{t("neighborhoodEvidenceNote")}</p>
-            <div className="coverage-status">
-              <ShieldCheck size={15} aria-hidden="true" />
-              {hazards?.copernicus.areas.some((area) => area.city === selectedCity)
-                ? t("officialCoverageAvailable")
-                : t("officialMappingPending")}
-            </div>
-            <button type="button" className="text-button" onClick={onSources}>
-              {t("liveSources")}
-            </button>
           </div>
           <div className="local-stats-grid" aria-label={t("interactiveStats")}>
-            <div>
-              <strong>{formatNumber(destroyedBuildings, language)}</strong>
-              <span>{t("destroyedBuildings")}</span>
-            </div>
-            <div>
-              <strong>{formatNumber(damagedBuildings, language)}</strong>
-              <span>{t("damagedBuildings")}</span>
-            </div>
-            <div>
-              <strong>{formatNumber(possiblyDamagedBuildings, language)}</strong>
-              <span>{t("possiblyDamagedBuildings")}</span>
-            </div>
             <div>
               <strong>{formatNumber(openReports.length, language)}</strong>
               <span>{t("communityNeeds")}</span>
             </div>
-          </div>
-          {mappedRoadBlocks ? (
-            <div className="road-stat">
-              <CircleAlert size={15} aria-hidden="true" />
-              {t("blockedRoadsCount", { count: mappedRoadBlocks })}
+            <div>
+              <strong>{formatNumber(affectedPeople, language)}</strong>
+              <span>{t("peopleLabel")}</span>
             </div>
-          ) : null}
-          <div className="local-evidence-filter" role="group" aria-label={t("filters")}>
-            <button
-              type="button"
-              className={localEvidenceFilter === "all" ? "is-active" : ""}
-              onClick={() => setLocalEvidenceFilter("all")}
-            >
-              {t("filterAll")}
-            </button>
-            <button
-              type="button"
-              className={localEvidenceFilter === "official" ? "is-active" : ""}
-              onClick={() => setLocalEvidenceFilter("official")}
-            >
-              {t("officialMappedDamage")}
-            </button>
-            <button
-              type="button"
-              className={localEvidenceFilter === "community" ? "is-active" : ""}
-              onClick={() => setLocalEvidenceFilter("community")}
-            >
-              {t("communityNeeds")}
-            </button>
+            <div>
+              <strong>
+                {visibleLocalAreas.filter((area) => area.criticalNeeds > 0).length}
+              </strong>
+              <span>{t("urgentSectors")}</span>
+            </div>
           </div>
           {visibleLocalAreas.length ? (
             visibleLocalAreas.slice(0, 30).map((area, index) => (
@@ -474,28 +374,7 @@ export function SidePanel({
                           : t("priorityActive")}
                     </span>
                   </span>
-                  {area.officialAreaName ? (
-                    <small>{area.officialAreaName} · Copernicus EMSR916</small>
-                  ) : null}
                   <span className="local-evidence-counts">
-                    {area.destroyed ? (
-                      <span className="damage-count damage-count--destroyed">
-                        {t("destroyedCount", { count: area.destroyed })}
-                      </span>
-                    ) : null}
-                    {area.damaged ? (
-                      <span className="damage-count damage-count--damaged">
-                        {t("damagedCount", { count: area.damaged })}
-                      </span>
-                    ) : null}
-                    {area.possiblyDamaged ? (
-                      <span className="damage-count damage-count--possible">
-                        {t("possibleCount", { count: area.possiblyDamaged })}
-                      </span>
-                    ) : null}
-                    {area.roadBlocks ? (
-                      <span>{t("blockedRoadsCount", { count: area.roadBlocks })}</span>
-                    ) : null}
                     {area.openReports ? (
                       <span>
                         {area.openReports === 1
@@ -512,11 +391,8 @@ export function SidePanel({
                         })}
                       </span>
                     ) : null}
-                    {area.modeledMmi != null ? (
-                      <span>{t("modeledMmi", { value: area.modeledMmi })}</span>
-                    ) : null}
-                    {area.observedCdi != null ? (
-                      <span>{t("observedCdi", { value: area.observedCdi })}</span>
+                    {area.criticalNeeds ? (
+                      <span>{t("urgentReports", { count: area.criticalNeeds })}</span>
                     ) : null}
                   </span>
                 </span>

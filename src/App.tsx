@@ -5,7 +5,6 @@ import { createTranslator, detectLanguage } from "./i18n";
 import { rankLocalAreas } from "./scoring";
 import type {
   CityId,
-  HazardResponse,
   Language,
   NeedType,
   Offer,
@@ -46,7 +45,6 @@ export default function App() {
   const [language, setLanguage] = useState<Language>(() => detectLanguage());
   const t = useMemo(() => createTranslator(language), [language]);
   const [user, setUser] = useState<User | null>(null);
-  const [hazards, setHazards] = useState<HazardResponse | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [selectedCity, setSelectedCity] = useState<CityId>("manizales");
@@ -60,16 +58,10 @@ export default function App() {
   const [draftPostType, setDraftPostType] = useState<PostType>("need");
   const [focusedLocation, setFocusedLocation] = useState<[number, number] | null>(null);
   const [layers, setLayers] = useState<MapLayers>({
-    base: "imagery",
-    nasa: false,
-    modeled: false,
-    observed: true,
-    officialDamage: true,
-    reports: true,
-    aftershocks: false
+    base: "streets",
+    reports: true
   });
-  const [satelliteDate, setSatelliteDate] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
   const [toast, setToast] = useState("");
@@ -77,16 +69,11 @@ export default function App() {
 
   const loadPublicData = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
-    const [hazardResult, reportResult] = await Promise.allSettled([
-      api.hazards(),
-      api.reports()
-    ]);
-    if (hazardResult.status === "fulfilled") {
-      setHazards(hazardResult.value);
-      setSatelliteDate((current) => current || hazardResult.value.satellite.latestSuggestedDate);
+    const reportResult = await Promise.allSettled([api.reports()]);
+    if (reportResult[0].status === "fulfilled") {
+      setReports(reportResult[0].value.reports);
     }
-    if (reportResult.status === "fulfilled") setReports(reportResult.value.reports);
-    setLoadError(hazardResult.status === "rejected" && reportResult.status === "rejected");
+    setLoadError(reportResult[0].status === "rejected");
     setLoading(false);
   }, []);
 
@@ -158,8 +145,8 @@ export default function App() {
   );
   const selectedReport = reports.find((report) => report.id === selectedReportId) ?? null;
   const localAreas = useMemo(
-    () => rankLocalAreas(selectedCity, hazards, reports),
-    [hazards, reports, selectedCity]
+    () => rankLocalAreas(selectedCity, null, reports),
+    [reports, selectedCity]
   );
   const inboxCount = offers.filter(
     (offer) => offer.direction === "received" && offer.status === "pending"
@@ -233,7 +220,7 @@ export default function App() {
         t={t}
         language={language}
         user={user}
-        hazards={hazards}
+        hazards={null}
         inboxCount={inboxCount}
         onLanguageChange={changeLanguage}
         onAuth={() => setActiveModal("auth")}
@@ -266,7 +253,7 @@ export default function App() {
           selectedPostType={selectedPostType}
           tab={tab}
           reports={visibleReports}
-          hazards={hazards}
+          hazards={null}
           localAreas={localAreas}
           onCityChange={changeCity}
           onNeedChange={setSelectedNeed}
@@ -284,17 +271,13 @@ export default function App() {
         />
         <MapView
           t={t}
-          language={language}
           selectedCity={selectedCity}
           reports={visibleReports}
-          hazards={hazards}
           selectedReportId={selectedReportId}
           focusedLocation={focusedLocation}
           layers={layers}
-          satelliteDate={satelliteDate}
           onCityChange={changeCity}
           onLayersChange={setLayers}
-          onSatelliteDateChange={setSatelliteDate}
           onReportSelect={(report) => setSelectedReportId(report.id)}
           onLocationError={() => setToast(t("locationError"))}
           onNeedHelp={openNeed}
@@ -368,7 +351,7 @@ export default function App() {
           <SourcesModal
             t={t}
             language={language}
-            hazards={hazards}
+            hazards={null}
             onClose={() => setActiveModal(null)}
           />
         ) : null}
@@ -387,7 +370,7 @@ export default function App() {
             language={language}
             report={selectedReport}
             user={user}
-            hazards={hazards}
+            hazards={null}
             onClose={() => setSelectedReportId(null)}
             onRequireAuth={() => setActiveModal("auth")}
             onChanged={(message) => void refreshAfterChange(message)}

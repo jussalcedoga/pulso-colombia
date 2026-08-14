@@ -2652,6 +2652,23 @@ p {
   box-shadow: 0 2px 10px rgb(22 29 34 / 14%);
 }
 
+.map-reference-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--give-dark);
+  font-weight: 760;
+  text-decoration: none;
+}
+
+.layer-panel > .layer-reference-link {
+  margin: 8px 12px 2px;
+  padding: 9px 10px;
+  font-size: 11px;
+  background: var(--surface-soft);
+  border-radius: 4px;
+}
+
 .map-evidence-strip > span,
 .map-evidence-strip > a {
   display: inline-flex;
