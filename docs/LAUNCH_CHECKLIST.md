@@ -34,6 +34,10 @@ Complete this before sharing beyond a small community pilot.
 - Confirm the sole moderator can close and permanently delete a disposable post.
 - Restore one account on two devices with the same recovery code and verify the
   inbox refreshes on open and browser focus.
+- Confirm contacting an available-help post opens chat immediately for both
+  parties, notifies the giver, and clears the unread badge when opened.
+- Confirm an offer sent to a need post cannot use chat until the recipient
+  accepts it.
 - Test edge rate limits and each endpoint-specific D1 rate limit.
 - Confirm Turnstile blocks a missing or invalid token when it is enabled.
 - Verify representative identity through an authority before setting `verified=1`.
@@ -46,8 +50,8 @@ Complete this before sharing beyond a small community pilot.
 - Test Spanish and English at 360 px, 768 px, and desktop widths.
 - Test with satellite tiles disabled on a slow connection.
 - Confirm every official external link and attribution.
-- Confirm the help, donation, registration, report, offer, acceptance, and
-  chat/resolution flows.
+- Confirm the help, donation, registration, report, direct giver-message,
+  offer acceptance, chat, unread, and resolution flows.
 - Confirm need, available-help, and update posts remain visually and
   mathematically distinct.
 - Explain publicly that the priority index is not a damage inspection.

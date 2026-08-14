@@ -6,7 +6,8 @@ import { ReportModal } from "./ReportModal";
 
 const apiMocks = vi.hoisted(() => ({
   deleteReport: vi.fn(),
-  reportComments: vi.fn()
+  reportComments: vi.fn(),
+  sendOffer: vi.fn()
 }));
 
 vi.mock("../api", () => ({
@@ -57,23 +58,25 @@ const moderator: User = {
   verified: false
 };
 
-function renderReport(user: User) {
+function renderReport(user: User, currentReport = report) {
   const onChanged = vi.fn();
   const onEdit = vi.fn();
+  const onConnectionCreated = vi.fn();
   render(
     <ReportModal
       t={createTranslator("en")}
       language="en"
-      report={report}
+      report={currentReport}
       user={user}
       hazards={null}
       onClose={vi.fn()}
       onEdit={onEdit}
       onRequireAuth={vi.fn()}
+      onConnectionCreated={onConnectionCreated}
       onChanged={onChanged}
     />
   );
-  return { onChanged, onEdit };
+  return { onChanged, onEdit, onConnectionCreated };
 }
 
 describe("moderator report deletion", () => {
@@ -83,6 +86,11 @@ describe("moderator report deletion", () => {
     vi.clearAllMocks();
     apiMocks.reportComments.mockResolvedValue({ comments: [] });
     apiMocks.deleteReport.mockResolvedValue({ ok: true });
+    apiMocks.sendOffer.mockResolvedValue({
+      id: "ofr_direct",
+      status: "accepted",
+      canChat: true
+    });
   });
 
   it("requires a second confirmation before deleting", async () => {
@@ -113,5 +121,38 @@ describe("moderator report deletion", () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(onEdit).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  });
+
+  it("starts a direct private conversation with an available-help giver", async () => {
+    const helpPost: Report = {
+      ...report,
+      id: "rpt_help",
+      postType: "offer",
+      details: "Drinking water is available for nearby families."
+    };
+    const { onConnectionCreated } = renderReport(
+      moderator,
+      helpPost
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Contact" }));
+    fireEvent.change(screen.getByLabelText("Private message"), {
+      target: { value: "We need water for three people near the center." }
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Send private message" })
+    );
+
+    await waitFor(() =>
+      expect(apiMocks.sendOffer).toHaveBeenCalledWith(
+        helpPost.id,
+        "supplies",
+        "We need water for three people near the center."
+      )
+    );
+    expect(onConnectionCreated).toHaveBeenCalledWith(
+      "ofr_direct",
+      "Message sent"
+    );
   });
 });

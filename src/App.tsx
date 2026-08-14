@@ -59,6 +59,9 @@ export default function App() {
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [editingReportId, setEditingReportId] = useState<string | null>(null);
+  const [initialConversationId, setInitialConversationId] = useState<string | null>(
+    null
+  );
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [pendingPostAfterAuth, setPendingPostAfterAuth] = useState<PostType | null>(null);
   const [draftPostType, setDraftPostType] = useState<PostType>("need");
@@ -163,9 +166,7 @@ export default function App() {
     () => rankLocalAreas(selectedCity, null, reports),
     [reports, selectedCity]
   );
-  const inboxCount = offers.filter(
-    (offer) => offer.direction === "received" && offer.status === "pending"
-  ).length;
+  const inboxCount = offers.filter((offer) => offer.unreadCount > 0).length;
   const defaultCity: CityId = selectedCity ?? user?.city ?? "manizales";
 
   const changeLanguage = (next: Language) => {
@@ -188,9 +189,22 @@ export default function App() {
   const openNeed = () => openPost("need");
   const openAvailableHelp = () => openPost("offer");
   const openInbox = () => {
+    setInitialConversationId(null);
     setActiveModal("inbox");
     void loadInbox(true);
   };
+
+  const markConversationRead = useCallback(
+    (offerId: string) => {
+      setOffers((current) =>
+        current.map((offer) =>
+          offer.id === offerId ? { ...offer, unreadCount: 0 } : offer
+        )
+      );
+      void api.markOfferRead(offerId).catch(() => loadInbox());
+    },
+    [loadInbox]
+  );
 
   const handleAuthSuccess = (nextUser: User, code?: string) => {
     setUser(nextUser);
@@ -219,6 +233,7 @@ export default function App() {
       setOffers([]);
       setSelectedReportId(null);
       setEditingReportId(null);
+      setInitialConversationId(null);
       setToast(t("signOut"));
     }
   };
@@ -393,8 +408,13 @@ export default function App() {
             offers={offers}
             loading={inboxLoading}
             loadError={inboxError}
+            initialOfferId={initialConversationId}
             onRefresh={() => void loadInbox(true)}
-            onClose={() => setActiveModal(null)}
+            onRead={markConversationRead}
+            onClose={() => {
+              setActiveModal(null);
+              setInitialConversationId(null);
+            }}
             onChanged={(message) => void refreshAfterChange(message, false)}
           />
         ) : null}
@@ -424,6 +444,13 @@ export default function App() {
               setActiveModal("need");
             }}
             onRequireAuth={() => setActiveModal("auth")}
+            onConnectionCreated={(offerId, message) => {
+              setToast(message);
+              setSelectedReportId(null);
+              setInitialConversationId(offerId);
+              setActiveModal("inbox");
+              void loadInbox(true);
+            }}
             onChanged={(message) => void refreshAfterChange(message)}
           />
         ) : null}

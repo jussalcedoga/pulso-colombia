@@ -12,13 +12,13 @@ Concurrency and request rate are different:
 - 200 people with the map open do not create 200 continuous connections.
 - Each visible client refreshes hazards and reports every 60 seconds.
 - A signed-in client also refreshes its private inbox every 60 seconds.
-- An open accepted chat requests incremental messages every 15 seconds.
+- An open active chat requests incremental messages every 20 seconds.
 - Hidden browser tabs stop these polling requests.
 
 At 200 continuously visible readers, the normal public polling load is about
 400 requests/minute, or 6.7 requests/second, before cache reuse. If all 200 are
 signed in, inbox polling adds about 3.3 requests/second. Open chats add up to
-0.067 requests/second each.
+0.05 requests/second each.
 
 ## Why It Remains Lightweight
 

@@ -41,6 +41,7 @@ interface ReportModalProps {
   onClose: () => void;
   onEdit: () => void;
   onRequireAuth: () => void;
+  onConnectionCreated: (offerId: string, message: string) => void;
   onChanged: (message: string) => void;
 }
 
@@ -77,6 +78,7 @@ export function ReportModal({
   onClose,
   onEdit,
   onRequireAuth,
+  onConnectionCreated,
   onChanged
 }: ReportModalProps) {
   const [mode, setMode] = useState<"details" | "offer" | "flag">("details");
@@ -192,8 +194,15 @@ export function ReportModal({
     setSubmitting(true);
     setError("");
     try {
-      await api.sendOffer(report.id, connectionType(report, offerType), message);
-      onChanged(report.postType === "need" ? t("offerSent") : t("messageSent"));
+      const result = await api.sendOffer(
+        report.id,
+        connectionType(report, offerType),
+        message
+      );
+      onConnectionCreated(
+        result.id,
+        report.postType === "need" ? t("offerSent") : t("messageSent")
+      );
     } catch (caught) {
       setError(caught instanceof ApiRequestError ? caught.message : t("genericError"));
     } finally {
@@ -522,9 +531,9 @@ export function ReportModal({
                 {t("deletePost")}
               </button>
             ) : null}
-            {!isAuthor && !canModerate ? (
+            {!isAuthor ? (
               <>
-                {report.postType === "need" ? (
+                {report.postType === "need" && !canModerate ? (
                   <button className="button button--secondary" type="button" disabled={submitting} onClick={confirm}>
                     <CheckCircle2 size={18} aria-hidden="true" />
                     {t("confirm")}
@@ -633,6 +642,7 @@ export function ReportModal({
               minLength={10}
               maxLength={500}
               value={message}
+              aria-label={t("privateMessage")}
               placeholder={
                 report.postType === "need"
                   ? t("privateMessagePlaceholder")

@@ -34,10 +34,19 @@ vi.mock("./api", () => ({
 }));
 
 vi.mock("./components/Header", () => ({
-  Header: ({ onInbox }: { onInbox: () => void }) => (
-    <button type="button" onClick={onInbox}>
-      Open test inbox
-    </button>
+  Header: ({
+    inboxCount,
+    onInbox
+  }: {
+    inboxCount: number;
+    onInbox: () => void;
+  }) => (
+    <>
+      <button type="button" onClick={onInbox}>
+        Open test inbox
+      </button>
+      <span>Unread conversations: {inboxCount}</span>
+    </>
   )
 }));
 
@@ -86,5 +95,41 @@ describe("desktop inbox", () => {
 
     expect(await screen.findByText("Inbox for usr_moderator")).toBeInTheDocument();
     await waitFor(() => expect(apiMocks.inbox).toHaveBeenCalledTimes(1));
+  });
+
+  it("counts unread direct conversations in the header", async () => {
+    apiMocks.inbox.mockResolvedValue({
+      offers: [
+        {
+          id: "ofr_unread",
+          reportId: "rpt_help",
+          direction: "received",
+          senderId: "usr_sender",
+          senderName: "Sender",
+          recipientId: "usr_moderator",
+          recipientName: "Owner",
+          offerType: "supplies",
+          message: "Can we coordinate pickup privately?",
+          responseMessage: "",
+          status: "accepted",
+          canChat: true,
+          unreadCount: 2,
+          createdAt: "2026-08-14 08:00:00",
+          updatedAt: "2026-08-14 08:05:00",
+          report: {
+            postType: "offer",
+            city: "manizales",
+            neighborhood: "Centro",
+            details: "Water is available for pickup."
+          }
+        }
+      ]
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByText("Unread conversations: 1")
+    ).toBeInTheDocument();
   });
 });

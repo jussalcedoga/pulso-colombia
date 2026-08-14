@@ -55,13 +55,21 @@ Public posts have one of three explicit types:
 - `update`: shares a short local notice or fundraiser announcement and never
   increases priority.
 
-Signed-in users can send a private connection request to a post author. The
-recipient must accept it before either participant can use the lightweight
-private chat. Open chat views request only messages newer than the latest local
-message every 15 seconds and immediately when the browser regains focus.
-Opening the inbox always requests a fresh `no-store` response. Recovery codes
-identify accounts across devices; equal display names do not share an inbox.
-The moderator cannot read a conversation unless that account is a participant.
+Signed-in users can send a private message to a post author. An offer sent to a
+`need` post remains pending until its recipient accepts it. A contact sent to an
+`offer` or `update` post opens a two-way private chat immediately without
+changing the public post's status. Each connection stores three small activity
+sequence counters so either participant gets an unread badge without storing
+read receipts per message. Opening a conversation atomically advances that
+participant's read sequence.
+
+The responsive inbox keeps only one conversation thread active. It includes the
+opening private message in the transcript, requests only messages newer than
+the latest local message every 20 seconds, and refreshes immediately when the
+browser regains focus. Opening the inbox always requests a fresh `no-store`
+response. Recovery codes identify accounts across devices; equal display names
+do not share an inbox. The moderator cannot read a conversation unless that
+account is a participant.
 
 Every visible post also has a public text discussion. Anyone may read it;
 posting requires an account. Resolved posts and their discussions leave public
@@ -88,7 +96,7 @@ return at most 100 posts and private reads return at most 100 offers or messages
 
 Hard growth limits include five unresolved posts and 25 new posts per account
 per 24 hours, 50 active connections per post, 200 public comments per post, and
-500 messages per accepted connection. A daily Cron Trigger removes:
+500 messages per active connection. A daily Cron Trigger removes:
 
 - Expired sessions and rate-limit buckets.
 - Chat messages older than 30 days.

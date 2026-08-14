@@ -74,6 +74,8 @@ export interface Offer {
   message: string;
   responseMessage: string;
   status: OfferStatus;
+  canChat: boolean;
+  unreadCount: number;
   createdAt: string;
   updatedAt: string;
   report: {

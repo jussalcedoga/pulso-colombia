@@ -1,0 +1,10 @@
+PRAGMA foreign_keys = ON;
+
+ALTER TABLE offers
+  ADD COLUMN activity_seq INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE offers
+  ADD COLUMN sender_read_seq INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE offers
+  ADD COLUMN recipient_read_seq INTEGER NOT NULL DEFAULT 0;

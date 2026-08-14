@@ -11,6 +11,12 @@ import {
   normalizeRecoveryCode,
   requireUser
 } from "./auth";
+import {
+  canOpenConversation,
+  initialConversationStatus,
+  type ConversationPostType,
+  type ConversationStatus
+} from "./conversations";
 import { getHazards } from "./hazards";
 import { geocode } from "./geocode";
 import {
@@ -681,7 +687,7 @@ async function createOffer(
   const offerType = enumValue(body.offerType, OFFER_TYPES, "El tipo de ayuda");
   const message = requiredString(body.message, "El mensaje", 10, 500);
   const report = await env.DB.prepare(
-    `SELECT r.user_id, r.status,
+    `SELECT r.user_id, r.status, r.post_type,
             (SELECT COUNT(*)
                FROM offers o
               WHERE o.report_id = r.id
@@ -690,7 +696,12 @@ async function createOffer(
       WHERE r.id = ?`
   )
     .bind(reportId)
-    .first<{ user_id: string; status: string; active_offers: number }>();
+    .first<{
+      user_id: string;
+      status: string;
+      post_type: ConversationPostType;
+      active_offers: number;
+    }>();
   if (!report) throw new HttpError(404, "report_not_found", "No se encontró el reporte.");
   if (report.user_id === user.id) {
     throw new HttpError(409, "self_offer", "No puedes enviarte una oferta a ti mismo.");
@@ -706,13 +717,23 @@ async function createOffer(
     );
   }
   const offerId = generateId("ofr");
+  const status = initialConversationStatus(report.post_type);
   try {
     await env.DB.prepare(
       `INSERT INTO offers
-        (id, report_id, sender_id, recipient_id, offer_type, message)
-       VALUES (?, ?, ?, ?, ?, ?)`
+        (id, report_id, sender_id, recipient_id, offer_type, message, status,
+         activity_seq, sender_read_seq, recipient_read_seq)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 0)`
     )
-      .bind(offerId, reportId, user.id, report.user_id, offerType, message)
+      .bind(
+        offerId,
+        reportId,
+        user.id,
+        report.user_id,
+        offerType,
+        message,
+        status
+      )
       .run();
   } catch (error) {
     if (String(error).includes("UNIQUE")) {
@@ -720,7 +741,14 @@ async function createOffer(
     }
     throw error;
   }
-  return json({ id: offerId }, { status: 201 });
+  return json(
+    {
+      id: offerId,
+      status,
+      canChat: canOpenConversation(status, report.post_type)
+    },
+    { status: 201 }
+  );
 }
 
 async function listInbox(env: Env, request: Request): Promise<Response> {
@@ -728,40 +756,52 @@ async function listInbox(env: Env, request: Request): Promise<Response> {
   const result = await env.DB.prepare(
     `SELECT o.id, o.report_id, o.sender_id, o.recipient_id, o.offer_type, o.message,
             o.response_message, o.status, o.created_at, o.updated_at,
+            o.activity_seq, o.sender_read_seq, o.recipient_read_seq,
             sender.display_name AS sender_name,
             recipient.display_name AS recipient_name,
             r.post_type, r.city, r.neighborhood, r.details AS report_details
        FROM offers o
        JOIN users sender ON sender.id = o.sender_id
        JOIN users recipient ON recipient.id = o.recipient_id
-       JOIN reports r ON r.id = o.report_id
+      JOIN reports r ON r.id = o.report_id
       WHERE o.sender_id = ? OR o.recipient_id = ?
-      ORDER BY o.created_at DESC
+      ORDER BY o.updated_at DESC, o.created_at DESC
       LIMIT 100`
   )
     .bind(user.id, user.id)
     .all<Record<string, unknown>>();
-  const offers = result.results.map((row) => ({
-    id: row.id,
-    reportId: row.report_id,
-    direction: row.recipient_id === user.id ? "received" : "sent",
-    senderId: row.sender_id,
-    senderName: row.sender_name,
-    recipientId: row.recipient_id,
-    recipientName: row.recipient_name,
-    offerType: row.offer_type,
-    message: row.message,
-    responseMessage: row.response_message,
-    status: row.status,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    report: {
-      postType: row.post_type,
-      city: row.city,
-      neighborhood: row.neighborhood,
-      details: row.report_details
-    }
-  }));
+  const offers = result.results.map((row) => {
+    const received = row.recipient_id === user.id;
+    const activitySequence = Number(row.activity_seq);
+    const readSequence = Number(
+      received ? row.recipient_read_seq : row.sender_read_seq
+    );
+    const postType = row.post_type as ConversationPostType;
+    const status = row.status as ConversationStatus;
+    return {
+      id: row.id,
+      reportId: row.report_id,
+      direction: received ? "received" : "sent",
+      senderId: row.sender_id,
+      senderName: row.sender_name,
+      recipientId: row.recipient_id,
+      recipientName: row.recipient_name,
+      offerType: row.offer_type,
+      message: row.message,
+      responseMessage: row.response_message,
+      status,
+      canChat: canOpenConversation(status, postType),
+      unreadCount: Math.max(0, activitySequence - readSequence),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      report: {
+        postType,
+        city: row.city,
+        neighborhood: row.neighborhood,
+        details: row.report_details
+      }
+    };
+  });
   return json({ offers }, { headers: { "cache-control": "no-store" } });
 }
 
@@ -776,7 +816,10 @@ async function updateOffer(env: Env, request: Request, offerId: string): Promise
   const responseMessage =
     status === "accepted" ? optionalString(body.responseMessage, 500) : "";
   const offer = await env.DB.prepare(
-    "SELECT report_id, sender_id, recipient_id, status FROM offers WHERE id = ?"
+    `SELECT o.report_id, o.sender_id, o.recipient_id, o.status, r.post_type
+       FROM offers o
+       JOIN reports r ON r.id = o.report_id
+      WHERE o.id = ?`
   )
     .bind(offerId)
     .first<{
@@ -784,6 +827,7 @@ async function updateOffer(env: Env, request: Request, offerId: string): Promise
       sender_id: string;
       recipient_id: string;
       status: string;
+      post_type: ConversationPostType;
     }>();
   if (!offer) throw new HttpError(404, "offer_not_found", "No se encontró la oferta.");
   const allowed =
@@ -797,11 +841,19 @@ async function updateOffer(env: Env, request: Request, offerId: string): Promise
   const statements = [
     env.DB
       .prepare(
-        "UPDATE offers SET status = ?, response_message = ?, updated_at = datetime('now') WHERE id = ?"
+        `UPDATE offers
+            SET status = ?, response_message = ?,
+                activity_seq = activity_seq + 1,
+                sender_read_seq =
+                  CASE WHEN sender_id = ? THEN activity_seq + 1 ELSE sender_read_seq END,
+                recipient_read_seq =
+                  CASE WHEN recipient_id = ? THEN activity_seq + 1 ELSE recipient_read_seq END,
+                updated_at = datetime('now')
+          WHERE id = ?`
       )
-      .bind(status, responseMessage, offerId)
+      .bind(status, responseMessage, user.id, user.id, offerId)
   ];
-  if (status === "accepted") {
+  if (status === "accepted" && offer.post_type === "need") {
     statements.push(
       env.DB
         .prepare(
@@ -813,7 +865,9 @@ async function updateOffer(env: Env, request: Request, offerId: string): Promise
     );
   }
   await env.DB.batch(statements);
-  if (status === "accepted") await invalidateReportCache();
+  if (status === "accepted" && offer.post_type === "need") {
+    await invalidateReportCache();
+  }
   return json({ ok: true });
 }
 
@@ -823,22 +877,53 @@ async function requireOfferParticipant(
   userId: string
 ): Promise<{ senderId: string; recipientId: string; status: string }> {
   const offer = await env.DB.prepare(
-    "SELECT sender_id, recipient_id, status FROM offers WHERE id = ?"
+    `SELECT o.sender_id, o.recipient_id, o.status, r.post_type
+       FROM offers o
+       JOIN reports r ON r.id = o.report_id
+      WHERE o.id = ?`
   )
     .bind(offerId)
-    .first<{ sender_id: string; recipient_id: string; status: string }>();
+    .first<{
+      sender_id: string;
+      recipient_id: string;
+      status: ConversationStatus;
+      post_type: ConversationPostType;
+    }>();
   if (!offer) throw new HttpError(404, "offer_not_found", "No se encontró la oferta.");
   if (offer.sender_id !== userId && offer.recipient_id !== userId) {
     throw new HttpError(403, "not_allowed", "No puedes acceder a esta conversación.");
   }
-  if (offer.status !== "accepted") {
-    throw new HttpError(409, "chat_not_open", "El chat se activa cuando la oferta es aceptada.");
+  if (!canOpenConversation(offer.status, offer.post_type)) {
+    throw new HttpError(409, "chat_not_open", "Esta conversación privada no está activa.");
   }
   return {
     senderId: offer.sender_id,
     recipientId: offer.recipient_id,
     status: offer.status
   };
+}
+
+async function markConversationRead(
+  env: Env,
+  request: Request,
+  offerId: string
+): Promise<Response> {
+  const user = await requireUser(env, request);
+  const updated = await env.DB.prepare(
+    `UPDATE offers
+        SET sender_read_seq =
+              CASE WHEN sender_id = ? THEN activity_seq ELSE sender_read_seq END,
+            recipient_read_seq =
+              CASE WHEN recipient_id = ? THEN activity_seq ELSE recipient_read_seq END
+      WHERE id = ? AND (sender_id = ? OR recipient_id = ?)
+      RETURNING id`
+  )
+    .bind(user.id, user.id, offerId, user.id, user.id)
+    .first<{ id: string }>();
+  if (!updated) {
+    throw new HttpError(404, "offer_not_found", "No se encontró la conversación.");
+  }
+  return json({ ok: true }, { headers: { "cache-control": "no-store" } });
 }
 
 async function listChatMessages(
@@ -907,6 +992,18 @@ async function createChatMessage(
       "Este chat alcanzó su límite de mensajes. Coordinen por un canal de confianza."
     );
   }
+  await env.DB.prepare(
+    `UPDATE offers
+        SET activity_seq = activity_seq + 1,
+            sender_read_seq =
+              CASE WHEN sender_id = ? THEN activity_seq + 1 ELSE sender_read_seq END,
+            recipient_read_seq =
+              CASE WHEN recipient_id = ? THEN activity_seq + 1 ELSE recipient_read_seq END,
+            updated_at = datetime('now')
+      WHERE id = ?`
+  )
+    .bind(user.id, user.id, offerId)
+    .run();
   return json(
     {
       message: {
@@ -986,6 +1083,10 @@ async function handleApi(env: Env, request: Request): Promise<Response> {
   }
   if (method === "POST" && chatOfferId) {
     return createChatMessage(env, request, chatOfferId);
+  }
+  const readOfferId = routeId(pathname, "/api/offers/", "/read");
+  if (method === "POST" && readOfferId) {
+    return markConversationRead(env, request, readOfferId);
   }
   const offerId = routeId(pathname, "/api/offers/");
   if (method === "PATCH" && offerId) return updateOffer(env, request, offerId);

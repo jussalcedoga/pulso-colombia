@@ -136,11 +136,19 @@ export const api = {
       }
     ),
   sendOffer: (reportId: string, offerType: OfferType, message: string) =>
-    request<{ id: string }>(`/api/reports/${encodeURIComponent(reportId)}/offers`, {
-      method: "POST",
-      body: JSON.stringify({ offerType, message })
-    }),
+    request<{ id: string; status: OfferStatus; canChat: boolean }>(
+      `/api/reports/${encodeURIComponent(reportId)}/offers`,
+      {
+        method: "POST",
+        body: JSON.stringify({ offerType, message })
+      }
+    ),
   inbox: () => request<{ offers: Offer[] }>("/api/inbox"),
+  markOfferRead: (id: string) =>
+    request<{ ok: boolean }>(`/api/offers/${encodeURIComponent(id)}/read`, {
+      method: "POST",
+      body: "{}"
+    }),
   updateOffer: (
     id: string,
     status: Extract<OfferStatus, "accepted" | "declined" | "withdrawn">,

@@ -3,7 +3,7 @@ const englishErrors: Record<string, string> = {
   body_too_large: "The request is too large.",
   chat_capacity:
     "This chat reached its message limit. Continue through a trusted channel.",
-  chat_not_open: "Chat opens after the connection request is accepted.",
+  chat_not_open: "This private conversation is not active.",
   comment_capacity: "This discussion reached its comment limit.",
   comments_closed: "This discussion is closed because the post was resolved.",
   content_type: "JSON content is required.",

@@ -55,8 +55,10 @@ posts, and separate **Necesito ayuda / I need help** and
   the center of an approximately 350 m-wide cell is stored. Remote-help posts
   do not request the helper's location.
 - Supports recovery-code accounts with no email vendor or password database.
-- Lets signed-in people confirm nearby needs, flag unsafe posts, send private
-  offers, accept/decline them, and chat after an offer is accepted.
+- Lets signed-in people confirm nearby needs, flag unsafe posts, and coordinate
+  privately. Offers sent to a need require acceptance; contacts to available
+  help or updates open a two-way chat immediately and carry lightweight unread
+  counts.
 - Gives every need, available-help post, and community update a lightweight
   public discussion. Only the single operator-assigned moderator can close or
   reopen posts. Authors can edit or delete their own posts, and the moderator
