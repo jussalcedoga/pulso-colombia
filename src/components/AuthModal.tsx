@@ -36,6 +36,10 @@ export function AuthModal({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (mode === "register" && turnstileSiteKey && !turnstileToken) {
+      setError(t("securityPending"));
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
@@ -179,10 +183,7 @@ export function AuthModal({
         <button
           className="button button--primary button--full"
           type="submit"
-          disabled={
-            submitting ||
-            (mode === "register" && Boolean(turnstileSiteKey) && !turnstileToken)
-          }
+          disabled={submitting}
         >
           {submitting
             ? mode === "register"

@@ -7,7 +7,7 @@ interface TurnstileApi {
     options: {
       sitekey: string;
       action: string;
-      appearance: "interaction-only";
+      appearance: "always";
       language: Language;
       size: "flexible";
       callback: (token: string) => void;
@@ -94,7 +94,7 @@ export function TurnstileWidget({
         widgetIdRef.current = turnstile.render(containerRef.current, {
           sitekey: siteKey,
           action,
-          appearance: "interaction-only",
+          appearance: "always",
           language,
           size: "flexible",
           callback: (token) => tokenCallbackRef.current(token),
