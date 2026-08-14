@@ -14,8 +14,11 @@
     <path d="M19 46h26M21 45v-9l4-8 4 8v9M35 45v-9l4-8 4 8v9"/>
     <path d="M25 33l7-7 7 7M28.5 45V29L32 16l3.5 13v16"/>
     <path d="M32 12v5M30.4 13.7h3.2M29.5 29l5 8M34.5 29l-5 8"/>
-    <circle cx="32" cy="37" r="2.1"/>
+    <rect x="28.7" y="35.3" width="6.6" height="4.2" rx=".25" fill="#fff" stroke-width=".8"/>
+    <path d="M32 35.3v4.2" stroke-width=".55"/>
+    <circle cx="30.3" cy="37.4" r=".75" stroke-width=".55"/>
+    <circle cx="33.7" cy="37.4" r=".75" stroke-width=".55"/>
     <path d="M30 45v-3.5c0-3 4-3 4 0V45"/>
   </g>
-  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M15 49h8l2-3 3 7 4-13 4 9h12"/>
+  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M15 49h8l2-3 3 7 4-7 4 3h12"/>
 </svg>

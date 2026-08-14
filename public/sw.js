@@ -1,4 +1,4 @@
-const CACHE_NAME = "pulso-shell-v6";
+const CACHE_NAME = "pulso-shell-v7";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(["/", "/manifest.webmanifest"])));
