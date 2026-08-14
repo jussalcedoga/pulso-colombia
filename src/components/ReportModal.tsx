@@ -100,7 +100,8 @@ export function ReportModal({
     .filter(
       (point) => latLngToCell(point.latitude, point.longitude, 9) === reportCell
     ).length ?? 0;
-  const isOwner = user?.id === report.userId;
+  const isAuthor = user?.id === report.userId;
+  const canModerate = user?.role === "moderator";
 
   useEffect(() => {
     let active = true;
@@ -468,7 +469,7 @@ export function ReportModal({
           </section>
           {error ? <div className="form-error" role="alert">{error}</div> : null}
           <div className="report-detail__actions">
-            {isOwner ? (
+            {canModerate ? (
               report.status === "resolved" ? (
                 <button className="button button--secondary" type="button" disabled={submitting} onClick={() => changeStatus("open")}>
                   {report.postType === "need" ? t("reopen") : t("reopenPost")}
@@ -481,13 +482,13 @@ export function ReportModal({
               )
             ) : (
               <>
-                {report.postType === "need" ? (
+                {report.postType === "need" && !isAuthor ? (
                   <button className="button button--secondary" type="button" disabled={submitting} onClick={confirm}>
                     <CheckCircle2 size={18} aria-hidden="true" />
                     {t("confirm")}
                   </button>
                 ) : null}
-                {report.status !== "resolved" ? (
+                {report.status !== "resolved" && !isAuthor ? (
                   <button
                     className="button button--give"
                     type="button"
@@ -504,7 +505,7 @@ export function ReportModal({
               </>
             )}
           </div>
-          {!isOwner ? (
+          {!isAuthor && !canModerate ? (
             <button
               className="flag-button"
               type="button"

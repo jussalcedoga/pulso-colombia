@@ -7,7 +7,9 @@ Complete this before sharing beyond a small community pilot.
 - Confirm the USGS event ID and event status.
 - Confirm each official donation URL directly with the organization.
 - Ask local emergency management to review Spanish terminology and city scope.
-- Identify at least two operators who can review flags and verify representatives.
+- Confirm the single owner-moderator account and an offline recovery procedure.
+- Identify trusted reviewers who can relay flags without receiving moderator
+  credentials.
 - Publish a contact and escalation process outside the public report feed.
 
 ## Cloudflare
@@ -26,7 +28,7 @@ Complete this before sharing beyond a small community pilot.
 - Verify exact coordinates are absent from D1 reports.
 - Confirm API responses carry CSP, frame, referrer, and MIME headers.
 - Test public phone/email rejection.
-- Test flag thresholds and operator review queries.
+- Test flag submission and operator review queries.
 - Test edge rate limits and each endpoint-specific D1 rate limit.
 - Confirm Turnstile blocks a missing or invalid token when it is enabled.
 - Verify representative identity through an authority before setting `verified=1`.

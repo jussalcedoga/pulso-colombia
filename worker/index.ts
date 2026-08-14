@@ -185,7 +185,8 @@ async function listReports(env: Env, request: Request): Promise<Response> {
            u.display_name, u.account_type, u.role, u.verified
       FROM reports r
       JOIN users u ON u.id = r.user_id
-     WHERE r.flags < 3 ${city ? "AND r.city = ?" : ""}
+     WHERE r.status != 'resolved'
+       ${city ? "AND r.city = ?" : ""}
      ORDER BY CASE r.status WHEN 'open' THEN 0 WHEN 'matched' THEN 1 ELSE 2 END,
               CASE r.post_type WHEN 'need' THEN r.urgency ELSE 0 END DESC,
               r.created_at DESC
@@ -341,12 +342,19 @@ async function updateReport(
   reportId: string
 ): Promise<Response> {
   const user = await requireUser(env, request);
+  if (user.role !== "moderator") {
+    throw new HttpError(
+      403,
+      "moderator_required",
+      "Solo la persona moderadora de Pulso puede cerrar publicaciones."
+    );
+  }
   const body = await readJson<{ status?: unknown }>(request);
-  const status = enumValue(body.status, ["open", "matched", "resolved"] as const, "El estado");
+  const status = enumValue(body.status, ["open", "resolved"] as const, "El estado");
   const result = await env.DB.prepare(
-    "UPDATE reports SET status = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?"
+    "UPDATE reports SET status = ?, updated_at = datetime('now') WHERE id = ?"
   )
-    .bind(status, reportId, user.id)
+    .bind(status, reportId)
     .run();
   if (!result.meta.changes) {
     throw new HttpError(404, "report_not_found", "No se encontró el reporte.");
@@ -361,7 +369,9 @@ async function confirmReport(
   reportId: string
 ): Promise<Response> {
   const user = await requireUser(env, request);
-  const report = await env.DB.prepare("SELECT user_id, post_type FROM reports WHERE id = ?")
+  const report = await env.DB.prepare(
+    "SELECT user_id, post_type FROM reports WHERE id = ? AND status != 'resolved'"
+  )
     .bind(reportId)
     .first<{ user_id: string; post_type: "need" | "offer" | "update" }>();
   if (!report) throw new HttpError(404, "report_not_found", "No se encontró el reporte.");
@@ -396,7 +406,9 @@ async function confirmReport(
 
 async function flagReport(env: Env, request: Request, reportId: string): Promise<Response> {
   const user = await requireUser(env, request);
-  const report = await env.DB.prepare("SELECT user_id FROM reports WHERE id = ?")
+  const report = await env.DB.prepare(
+    "SELECT user_id FROM reports WHERE id = ? AND status != 'resolved'"
+  )
     .bind(reportId)
     .first<{ user_id: string }>();
   if (!report) throw new HttpError(404, "report_not_found", "No se encontró el reporte.");
@@ -435,7 +447,7 @@ async function listReportComments(
 ): Promise<Response> {
   const viewer = await getSessionUser(env, request);
   const report = await env.DB.prepare(
-    "SELECT id FROM reports WHERE id = ? AND flags < 3"
+    "SELECT id FROM reports WHERE id = ? AND status != 'resolved'"
   )
     .bind(reportId)
     .first<{ id: string }>();
@@ -491,7 +503,7 @@ async function createReportComment(
   rejectPublicContactInfo(message);
 
   const report = await env.DB.prepare(
-    "SELECT status FROM reports WHERE id = ? AND flags < 3"
+    "SELECT status FROM reports WHERE id = ?"
   )
     .bind(reportId)
     .first<{ status: string }>();
@@ -555,7 +567,7 @@ async function createOffer(
               WHERE o.report_id = r.id
                 AND o.status IN ('pending', 'accepted')) AS active_offers
        FROM reports r
-      WHERE r.id = ? AND r.flags < 3`
+      WHERE r.id = ?`
   )
     .bind(reportId)
     .first<{ user_id: string; status: string; active_offers: number }>();
@@ -673,7 +685,9 @@ async function updateOffer(env: Env, request: Request, offerId: string): Promise
     statements.push(
       env.DB
         .prepare(
-          "UPDATE reports SET status = 'matched', updated_at = datetime('now') WHERE id = ?"
+          `UPDATE reports
+              SET status = 'matched', updated_at = datetime('now')
+            WHERE id = ? AND status != 'resolved'`
         )
         .bind(offer.report_id)
     );

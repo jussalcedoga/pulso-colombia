@@ -58,7 +58,8 @@ posts, and separate **Necesito ayuda / I need help** and
 - Lets signed-in people confirm nearby needs, flag unsafe posts, send private
   offers, accept/decline them, and chat after an offer is accepted.
 - Gives every need, available-help post, and community update a lightweight
-  public discussion; only the author can resolve or reopen their post.
+  public discussion. Only the single operator-assigned moderator can close or
+  reopen posts; resolved posts leave the public feed.
 - Links only to configured official organization domains. Pulso does not process
   money or charge fees.
 - Runs as a Cloudflare Worker with static assets and D1 on the free tier.
@@ -172,12 +173,27 @@ npx wrangler d1 execute pulso-colombia --remote \
 Never verify from display name alone. Record the authority or organization that
 performed the check outside Pulso.
 
+## Owner Moderation
+
+Exactly one account may hold the `moderator` role. This operator can close any
+community post; authors and other users cannot close posts. Assign the role only
+after verifying control of the intended Pulso account:
+
+```bash
+npx wrangler d1 execute pulso-colombia --remote \
+  --command="UPDATE users SET role='moderator' WHERE id='usr_REVIEWED_OWNER_ID'"
+```
+
+Keep the moderator recovery code private. Resolved posts and their public
+discussions leave public APIs and expire under the normal retention policy.
+
 ## Privacy And Abuse Controls
 
 - Public reports and comments reject phone numbers and email addresses.
 - Exact submitted coordinates are never stored.
 - Offers and replies require authentication and are private to both parties.
-- Public posts disappear after three independent flags pending operator review.
+- Flags are retained for moderator review but do not automatically remove a
+  community post.
 - Every API request has an edge limit; writes have a stricter edge limit.
 - Registration, login, reports, comments, offers, and chat also have D1-backed
   limits.

@@ -54,8 +54,9 @@ private chat. Open chat views request only messages newer than the latest local
 message every 15 seconds. Inbox and chat responses are always `no-store`.
 
 Every visible post also has a public text discussion. Anyone may read it;
-posting requires an account. Resolved posts reject new comments, and only the
-post author may resolve or reopen their post.
+posting requires an account. Resolved posts and their discussions leave public
+APIs. Only the single operator-assigned `moderator` account may resolve or
+reopen a post; post authors cannot change closure state.
 
 Available-help posts explicitly distinguish local and remote support. Local
 help stores and displays an approximate pin. Remote help is associated with a
@@ -139,7 +140,8 @@ addresses. Private offer messages can contain voluntary coordination details.
 
 ## Known MVP Limits
 
-- No authority moderation dashboard; moderation uses D1 CLI and flag thresholds.
+- No authority moderation dashboard; flags remain in D1 for moderator review
+  and never hide a post automatically.
 - Chat uses polling rather than WebSockets and has no attachment support.
 - No Pulso-authored automatic satellite change detection or damage inference;
   building findings are official Copernicus classifications with their original

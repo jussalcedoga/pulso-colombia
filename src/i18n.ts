@@ -219,13 +219,20 @@ const es = {
   urgency3: "Urgente",
   urgency5: "Crítico",
   details: "Descripción",
-  detailsPlaceholder: "Describe qué hace falta, desde cuándo y cualquier condición relevante.",
+  detailsPlaceholder:
+    "Explica qué ocurrió, qué hace falta, cantidades, personas afectadas, desde cuándo y restricciones de acceso.",
   offerDetailsPlaceholder:
-    "Describe el apoyo disponible, cantidades aproximadas y condiciones relevantes.",
+    "Detalla qué puedes ofrecer, cantidades, horarios, cobertura, entrega o recogida y condiciones.",
   updateDetailsPlaceholder:
-    "Comparte el dato principal, quién lo publica y cómo puede verificarse.",
+    "Indica qué cambió, lugar y hora, fuente, impacto para la comunidad y cómo puede verificarse.",
+  needDetailsHint:
+    "Incluye cantidades, urgencia, accesibilidad y contexto verificable. Mantén teléfonos y datos financieros en mensajes privados.",
+  offerDetailsHint:
+    "Aclara capacidad, disponibilidad, transporte y límites. Comparte contacto personal solo en una conversación privada aceptada.",
+  updateDetailsHint:
+    "Añade fecha, fuente y efecto práctico. No publiques teléfonos, cuentas bancarias ni datos personales.",
   privacyWarning:
-    "No escribas la dirección exacta en la descripción. No incluyas teléfono, correo, datos bancarios ni nombres de menores. Pulso elimina publicaciones antiguas.",
+    "No publiques dirección exacta, teléfono, correo, cuentas bancarias ni nombres de menores. Tras aceptar una conexión confiable, coordina datos de contacto por Mensajes.",
   publishReport: "Publicar necesidad",
   publishOffer: "Publicar ayuda",
   publishUpdate: "Publicar actualización",
@@ -595,13 +602,20 @@ const en: Record<TranslationKey, string> = {
   urgency3: "Urgent",
   urgency5: "Critical",
   details: "Description",
-  detailsPlaceholder: "Describe what is needed, since when, and any relevant conditions.",
+  detailsPlaceholder:
+    "Explain what happened, what is needed, quantities, people affected, timing, and access constraints.",
   offerDetailsPlaceholder:
-    "Describe the available support, approximate quantities, and relevant conditions.",
+    "Detail what you can provide, quantities, hours, coverage, pickup or delivery, and conditions.",
   updateDetailsPlaceholder:
-    "Share the main information, who is posting it, and how it can be verified.",
+    "State what changed, place and time, source, community impact, and how it can be verified.",
+  needDetailsHint:
+    "Include quantities, urgency, accessibility, and verifiable context. Keep phone and financial details in private messages.",
+  offerDetailsHint:
+    "Clarify capacity, availability, transport, and limits. Share personal contact details only in an accepted private conversation.",
+  updateDetailsHint:
+    "Add the date, source, and practical effect. Do not publish phone numbers, bank accounts, or personal data.",
   privacyWarning:
-    "Do not type the exact address in the description. Do not include a phone, email, bank details, or children's names. Pulso removes old posts.",
+    "Do not publish an exact address, phone, email, bank account, or children's names. After accepting a trusted connection, coordinate contact details through Messages.",
   publishReport: "Post need",
   publishOffer: "Post help",
   publishUpdate: "Post update",

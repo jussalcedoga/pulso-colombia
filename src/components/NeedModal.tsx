@@ -542,6 +542,13 @@ export function NeedModal({
             onChange={(event) => setDetails(event.target.value)}
             required
           />
+          <small>
+            {postType === "need"
+              ? t("needDetailsHint")
+              : postType === "offer"
+                ? t("offerDetailsHint")
+                : t("updateDetailsHint")}
+          </small>
           <small className="char-count">
             {t("charCount", {
               count: details.length,
