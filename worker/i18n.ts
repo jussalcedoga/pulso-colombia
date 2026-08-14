@@ -4,6 +4,8 @@ const englishErrors: Record<string, string> = {
   chat_capacity:
     "This chat reached its message limit. Continue through a trusted channel.",
   chat_not_open: "Chat opens after the connection request is accepted.",
+  comment_capacity: "This discussion reached its comment limit.",
+  comments_closed: "This discussion is closed because the post was resolved.",
   content_type: "JSON content is required.",
   edge_rate_limited: "Too many requests. Wait a moment before continuing.",
   geocode_busy: "Address search is busy. Wait two seconds and try again.",

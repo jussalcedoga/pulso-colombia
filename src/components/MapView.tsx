@@ -1,5 +1,4 @@
-import { cellToBoundary } from "h3-js";
-import L, { type LatLngExpression, type Map as LeafletMap } from "leaflet";
+import L, { type Map as LeafletMap } from "leaflet";
 import {
   CircleAlert,
   ExternalLink,
@@ -12,18 +11,16 @@ import {
   Satellite,
   X
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   MapContainer,
   Marker,
-  Polygon,
   TileLayer,
   Tooltip,
   useMap
 } from "react-leaflet";
 import { CITIES, cityDefinition } from "../data";
 import type { TFunction } from "../i18n";
-import { scoreColor, summarizeCells } from "../scoring";
 import type { CityId, NeedType, Report } from "../types";
 
 export interface MapLayers {
@@ -69,7 +66,7 @@ function MapController({
   }, [map, selectedCity]);
 
   useEffect(() => {
-    if (selectedReport) {
+    if (selectedReport && selectedReport.locationMode === "local") {
       map.flyTo([selectedReport.latitude, selectedReport.longitude], 17, {
         duration: 0.45
       });
@@ -83,41 +80,28 @@ function MapController({
   return null;
 }
 
-function markerSymbol(report: Report): string {
-  if (report.postType === "offer") return "+";
-  if (report.postType === "update") return "i";
-  const symbols: Record<NeedType, string> = {
-    water: "W",
-    food: "F",
-    shelter: "H",
-    medical: "+",
-    hygiene: "C",
-    rescue: "!",
-    transport: "T",
-    information: "i",
-    funds: "$"
-  };
-  return symbols[report.needTypes[0]] ?? "!";
-}
-
 function reportMarker(report: Report, selected: boolean): L.DivIcon {
-  const color =
-    report.status === "resolved"
-      ? "#64717b"
+  const severityColors = ["#668aa3", "#3f8f63", "#d39a1e", "#df6b2b", "#c93443"];
+  const color = report.status === "resolved"
+    ? "#64717b"
+    : report.postType === "offer"
+      ? "#167a67"
+      : report.postType === "update"
+        ? "#2f74a7"
+        : severityColors[report.urgency - 1] ?? severityColors[2];
+  const label =
+    report.postType === "need"
+      ? String(report.urgency)
       : report.postType === "offer"
-        ? "#167a67"
-        : report.postType === "update"
-          ? "#2f74a7"
-          : report.urgency >= 4
-            ? "#c93443"
-            : "#d77a26";
+        ? "+"
+        : "i";
   return L.divIcon({
     className: "report-marker-wrap",
     html:
-      `<span class="report-dot${selected ? " is-selected" : ""}" ` +
-      `style="--marker-color:${color}"><span>${markerSymbol(report)}</span></span>`,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17]
+      `<span class="report-pin${selected ? " is-selected" : ""}" ` +
+      `style="--marker-color:${color}"><span>${label}</span></span>`,
+    iconSize: [36, 44],
+    iconAnchor: [18, 42]
   });
 }
 
@@ -159,8 +143,6 @@ export function MapView({
   const selectedReport =
     reports.find((report) => report.id === selectedReportId) ?? null;
   const city = cityDefinition(selectedCity);
-  const cells = useMemo(() => summarizeCells(reports), [reports]);
-
   const locate = () => {
     if (!navigator.geolocation) {
       onLocationError();
@@ -228,41 +210,11 @@ export function MapView({
         )}
 
         {layers.reports
-          ? cells.map((cell) => {
-              const positions = cellToBoundary(cell.h3Cell) as [number, number][];
-              const topReport = reports
-                .filter((report) => cell.reportIds.includes(report.id))
-                .sort((a, b) => b.urgency - a.urgency)[0];
-              return (
-                <Polygon
-                  key={cell.h3Cell}
-                  positions={positions as LatLngExpression[]}
-                  pathOptions={{
-                    color: scoreColor(cell.score),
-                    fillColor: scoreColor(cell.score),
-                    fillOpacity: 0.08,
-                    opacity: 0.9,
-                    weight: 2
-                  }}
-                  eventHandlers={
-                    topReport ? { click: () => onReportSelect(topReport) } : undefined
-                  }
-                >
-                  <Tooltip sticky>
-                    <strong>{t("communityReports")}</strong>
-                    <br />
-                    {cell.reportCount === 1
-                      ? t("oneReport")
-                      : t("reportsLabel", { count: cell.reportCount })}
-                  </Tooltip>
-                </Polygon>
-              );
-            })
-          : null}
-
-        {layers.reports
           ? reports
-              .filter((report) => report.status !== "resolved")
+              .filter(
+                (report) =>
+                  report.status !== "resolved" && report.locationMode === "local"
+              )
               .map((report) => (
                 <Marker
                   key={report.id}
@@ -279,6 +231,12 @@ export function MapView({
                       : report.postType === "update"
                         ? t("updatePost")
                         : needSummary(report, t)}
+                    {report.postType === "need" ? (
+                      <>
+                        <br />
+                        {t("urgencyLevel", { count: report.urgency })}
+                      </>
+                    ) : null}
                   </Tooltip>
                 </Marker>
               ))
@@ -400,6 +358,14 @@ export function MapView({
               }
             />
           </label>
+          <div className="severity-legend" aria-label={t("severityLegend")}>
+            <strong>{t("urgency")}</strong>
+            <span><i className="severity-swatch severity-swatch--1" />1</span>
+            <span><i className="severity-swatch severity-swatch--2" />2</span>
+            <span><i className="severity-swatch severity-swatch--3" />3</span>
+            <span><i className="severity-swatch severity-swatch--4" />4</span>
+            <span><i className="severity-swatch severity-swatch--5" />5</span>
+          </div>
           <a
             className="layer-reference-link"
             href={CEMS_ACTIVATION_URL}

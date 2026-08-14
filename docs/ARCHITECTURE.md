@@ -6,8 +6,8 @@ Pulso deploys as one Cloudflare Worker:
 
 - Cloudflare static assets serve the Vite/React client.
 - Worker routes under `/api/*` provide application and upstream-data APIs.
-- D1 stores users, sessions, approximate reports, confirmations, flags, and
-  private aid offers and chat messages.
+- D1 stores users, sessions, approximate reports, confirmations, flags, bounded
+  public comments, and private aid offers and chat messages.
 - Copernicus EMS, USGS, NASA, Esri, and OpenStreetMap remain upstream data
   providers; Pulso caches and presents their attributed public products.
 
@@ -37,7 +37,7 @@ The browser renders:
 - Copernicus analyzed-area boundaries, building findings, and road blocks.
 - Separate USGS modeled-MMI and observed-DYFI cells.
 - Aftershock markers.
-- H3 community-report cells and approximate report markers.
+- Severity-colored approximate community-report pins.
 
 ## Community Flow
 
@@ -53,6 +53,15 @@ recipient must accept it before either participant can use the lightweight
 private chat. Open chat views request only messages newer than the latest local
 message every 15 seconds. Inbox and chat responses are always `no-store`.
 
+Every visible post also has a public text discussion. Anyone may read it;
+posting requires an account. Resolved posts reject new comments, and only the
+post author may resolve or reopen their post.
+
+Available-help posts explicitly distinguish local and remote support. Local
+help stores and displays an approximate pin. Remote help is associated with a
+target community but does not request or display the helper's location and
+never creates a map marker.
+
 ## Storage Bounds
 
 The API stores text only: no photos, video, attachments, or coordinate history.
@@ -61,11 +70,12 @@ characters; chats are at most 500 characters per message. Default public reads
 return at most 100 posts and private reads return at most 100 offers or messages.
 
 Hard growth limits include five unresolved posts and 25 new posts per account
-per 24 hours, 50 active connections per post, and 500 messages per accepted
-connection. A daily Cron Trigger removes:
+per 24 hours, 50 active connections per post, 200 public comments per post, and
+500 messages per accepted connection. A daily Cron Trigger removes:
 
 - Expired sessions and rate-limit buckets.
 - Chat messages older than 30 days.
+- Public comments older than 30 days.
 - Private connection records older than 90 days.
 - Resolved posts after 30 days.
 - Available-help and update posts after 30 days.
@@ -120,11 +130,12 @@ representative status is an operator-controlled field.
 
 ## Privacy Boundary
 
-The report API accepts a location only long enough to derive an H3 resolution 9
-cell, roughly 350 m across. It stores the cell and cell center, not the submitted
-coordinate. Public
-details reject likely phone numbers and email addresses. Private offer messages
-can contain voluntary coordination details.
+For localized posts, the API accepts a location only long enough to derive an
+H3 resolution 9 cell, roughly 350 m across. It stores the cell and cell center,
+not the submitted coordinate. Remote-help posts do not accept a helper location;
+they store a derived target-community anchor that is never rendered as a map
+pin. Public details and comments reject likely phone numbers and email
+addresses. Private offer messages can contain voluntary coordination details.
 
 ## Known MVP Limits
 

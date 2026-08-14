@@ -3,6 +3,7 @@ import {
   BadgeCheck,
   ChevronRight,
   CircleAlert,
+  Globe2,
   HeartHandshake,
   ListFilter,
   MapPin,
@@ -62,6 +63,18 @@ function needLabel(type: NeedType, t: TFunction): string {
       funds: "needFunds"
     }[type] as Parameters<TFunction>[0]
   );
+}
+
+function reportAreaLabel(
+  report: Report,
+  language: Language,
+  t: TFunction
+): string {
+  const city = CITIES.find((item) => item.id === report.city);
+  const cityName = language === "es" ? city?.name : city?.nameEn;
+  return report.locationMode === "remote"
+    ? t("remoteHelpFor", { city: cityName ?? "" })
+    : report.neighborhood || cityName || "";
 }
 
 export function SidePanel({
@@ -246,9 +259,17 @@ export function SidePanel({
                   ) : report.postType === "offer" ? (
                     <span
                       className="post-kind-indicator post-kind-indicator--offer"
-                      aria-label={t("offerPost")}
+                      aria-label={
+                        report.locationMode === "remote"
+                          ? t("remoteHelp")
+                          : t("offerPost")
+                      }
                     >
-                      <HeartHandshake size={17} aria-hidden="true" />
+                      {report.locationMode === "remote" ? (
+                        <Globe2 size={17} aria-hidden="true" />
+                      ) : (
+                        <HeartHandshake size={17} aria-hidden="true" />
+                      )}
                     </span>
                   ) : (
                     <span
@@ -260,10 +281,7 @@ export function SidePanel({
                   )}
                   <span className="report-row__content">
                     <span className="report-row__meta">
-                      <strong>
-                        {report.neighborhood ||
-                          CITIES.find((city) => city.id === report.city)?.name}
-                      </strong>
+                      <strong>{reportAreaLabel(report, language, t)}</strong>
                       <span>{formatRelativeTime(report.createdAt, language, t)}</span>
                     </span>
                     <span className="report-row__details">{report.details}</span>
@@ -277,7 +295,11 @@ export function SidePanel({
                       </span>
                       <span>
                         {report.postType === "offer"
-                          ? `${t("offerPost")} · `
+                          ? `${t(
+                              report.locationMode === "remote"
+                                ? "remoteHelp"
+                                : "offerPost"
+                            )} · `
                           : report.postType === "update"
                             ? `${t("updatePost")} · `
                             : ""}

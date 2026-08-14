@@ -1,6 +1,7 @@
 import {
   CircleAlert,
   Crosshair,
+  Globe2,
   HeartHandshake,
   LoaderCircle,
   LocateFixed,
@@ -9,7 +10,7 @@ import {
   Search,
   ShieldAlert
 } from "lucide-react";
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { api, ApiRequestError } from "../api";
 import { CITIES, isPointInCityBounds, NEED_TYPES } from "../data";
 import type { TFunction } from "../i18n";
@@ -17,6 +18,7 @@ import type {
   CityId,
   GeocodeResult,
   Language,
+  LocationMode,
   NeedType,
   PostType,
   User
@@ -63,6 +65,7 @@ export function NeedModal({
   onPublished
 }: NeedModalProps) {
   const [postType, setPostType] = useState<PostType>(initialPostType);
+  const [locationMode, setLocationMode] = useState<LocationMode>("local");
   const [city, setCity] = useState<CityId>(initialCity || user.city);
   const [neighborhood, setNeighborhood] = useState("");
   const [needTypes, setNeedTypes] = useState<NeedType[]>([]);
@@ -79,14 +82,14 @@ export function NeedModal({
   const [turnstileReset, setTurnstileReset] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const addressSearchInFlight = useRef(false);
+  const isRemoteOffer = postType === "offer" && locationMode === "remote";
 
   const toggleNeed = (type: NeedType) => {
     setNeedTypes((current) =>
       current.includes(type)
         ? current.filter((item) => item !== type)
-        : current.length < 5
-          ? [...current, type]
-          : current
+        : [...current, type]
     );
   };
 
@@ -109,20 +112,36 @@ export function NeedModal({
   };
 
   const searchAddress = async () => {
+    if (addressSearchInFlight.current) return;
     const query = addressQuery.trim();
     if (query.length < 3) {
       setError(t("addressSearchMinimum"));
       return;
     }
+    addressSearchInFlight.current = true;
     setSearchingAddress(true);
     setError("");
     try {
-      const result = await api.geocode(query, city);
+      let result;
+      try {
+        result = await api.geocode(query, city);
+      } catch (caught) {
+        if (
+          caught instanceof ApiRequestError &&
+          caught.code === "geocode_busy"
+        ) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1_200));
+          result = await api.geocode(query, city);
+        } else {
+          throw caught;
+        }
+      }
       setAddressResults(result.results);
       if (!result.results.length) setError(t("addressNoResults"));
     } catch (caught) {
       setError(caught instanceof ApiRequestError ? caught.message : t("genericError"));
     } finally {
+      addressSearchInFlight.current = false;
       setSearchingAddress(false);
     }
   };
@@ -171,7 +190,7 @@ export function NeedModal({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!location) {
+    if (!isRemoteOffer && !location) {
       setError(t("locationPending"));
       return;
     }
@@ -192,10 +211,11 @@ export function NeedModal({
     try {
       await api.createReport({
         postType,
+        locationMode: isRemoteOffer ? "remote" : "local",
         city,
-        neighborhood,
-        latitude: location[0],
-        longitude: location[1],
+        neighborhood: isRemoteOffer ? "" : neighborhood,
+        latitude: location?.[0],
+        longitude: location?.[1],
         needTypes,
         urgency: postType === "need" ? urgency : 1,
         peopleCount: postType === "update" ? 1 : peopleCount,
@@ -258,8 +278,48 @@ export function NeedModal({
             : t("updateFormIntro")}
       </p>
       <form className="form-grid" onSubmit={submit}>
+        {postType === "offer" ? (
+          <fieldset className="field field--wide help-location-choice">
+            <legend>{t("helpDeliveryMode")}</legend>
+            <div
+              className="segmented-control help-location-control"
+              role="group"
+              aria-label={t("helpDeliveryMode")}
+            >
+              <button
+                type="button"
+                className={locationMode === "local" ? "is-active" : ""}
+                aria-pressed={locationMode === "local"}
+                onClick={() => {
+                  setLocationMode("local");
+                  setError("");
+                }}
+              >
+                <MapPin size={17} aria-hidden="true" />
+                {t("localHelp")}
+              </button>
+              <button
+                type="button"
+                className={locationMode === "remote" ? "is-active" : ""}
+                aria-pressed={locationMode === "remote"}
+                onClick={() => {
+                  setLocationMode("remote");
+                  setError("");
+                }}
+              >
+                <Globe2 size={17} aria-hidden="true" />
+                {t("remoteHelp")}
+              </button>
+            </div>
+            <small>
+              {locationMode === "remote"
+                ? t("remoteHelpModeNote")
+                : t("localHelpModeNote")}
+            </small>
+          </fieldset>
+        ) : null}
         <label className="field">
-          <span>{t("yourCity")}</span>
+          <span>{isRemoteOffer ? t("communityToSupport") : t("yourCity")}</span>
           <select
             value={city}
             onChange={(event) => changeCity(event.target.value as CityId)}
@@ -271,18 +331,26 @@ export function NeedModal({
             ))}
           </select>
         </label>
-        <label className="field">
-          <span>{t("neighborhood")}</span>
-          <input
-            type="text"
-            value={neighborhood}
-            maxLength={60}
-            placeholder={t("neighborhoodPlaceholder")}
-            onChange={(event) => setNeighborhood(event.target.value)}
-          />
-        </label>
+        {!isRemoteOffer ? (
+          <label className="field">
+            <span>{t("neighborhood")}</span>
+            <input
+              type="text"
+              value={neighborhood}
+              maxLength={60}
+              placeholder={t("neighborhoodPlaceholder")}
+              onChange={(event) => setNeighborhood(event.target.value)}
+            />
+          </label>
+        ) : (
+          <div className="remote-help-context">
+            <Globe2 size={19} aria-hidden="true" />
+            <span>{t("remoteHelperLocationPrivate")}</span>
+          </div>
+        )}
 
-        <div className="field field--wide location-field">
+        {!isRemoteOffer ? (
+          <div className="field field--wide location-field">
           <span>{t("findLocation")}</span>
           <div className="address-search">
             <Search size={18} aria-hidden="true" />
@@ -350,6 +418,7 @@ export function NeedModal({
           <LocationPickerMap
             city={city}
             location={location}
+            urgency={postType === "need" ? urgency : 3}
             label={t("locationMap")}
             onChange={(nextLocation) => chooseLocation(nextLocation)}
             onInvalid={() => setError(t("locationOutsideCity"))}
@@ -375,7 +444,8 @@ export function NeedModal({
               OpenStreetMap
             </a>
           </small>
-        </div>
+          </div>
+        ) : null}
 
         <fieldset className="field field--wide">
           <legend>
@@ -398,6 +468,17 @@ export function NeedModal({
               </label>
             ))}
           </div>
+          <p
+            className={`need-selection-summary${needTypes.length ? " is-active" : ""}`}
+            aria-live="polite"
+          >
+            {needTypes.length
+              ? t("needsSelected", {
+                  count: needTypes.length,
+                  needs: needTypes.map((type) => needLabel(type, t)).join(", ")
+                })
+              : t("selectMultipleNeeds")}
+          </p>
         </fieldset>
 
         {postType !== "update" ? (

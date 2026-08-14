@@ -142,6 +142,13 @@ export function approximateLocation(
   };
 }
 
+export function targetCityAnchor(
+  city: (typeof CITY_IDS)[number]
+): { h3Cell: string; latitude: number; longitude: number } {
+  const [south, west, north, east] = CITY_BOUNDS[city];
+  return approximateLocation((south + north) / 2, (west + east) / 2, city);
+}
+
 export function rejectPublicContactInfo(text: string): void {
   const email = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
   const phone = /(?:\+?\d[\s().-]*){7,}/;

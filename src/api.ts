@@ -3,6 +3,7 @@ import type {
   CityId,
   GeocodeResult,
   HazardResponse,
+  LocationMode,
   NeedType,
   Offer,
   OfferStatus,
@@ -10,6 +11,7 @@ import type {
   PostType,
   PublicConfig,
   Report,
+  ReportComment,
   ReportStatus,
   User
 } from "./types";
@@ -80,10 +82,11 @@ export const api = {
   logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
   createReport: (payload: {
     postType: PostType;
+    locationMode: LocationMode;
     city: CityId;
     neighborhood: string;
-    latitude: number;
-    longitude: number;
+    latitude?: number;
+    longitude?: number;
     needTypes: NeedType[];
     urgency: number;
     peopleCount: number;
@@ -108,6 +111,18 @@ export const api = {
     request<{ ok: boolean; changed: boolean }>(
       `/api/reports/${encodeURIComponent(id)}/flag`,
       { method: "POST", body: JSON.stringify({ reason }) }
+    ),
+  reportComments: (reportId: string) =>
+    request<{ comments: ReportComment[] }>(
+      `/api/reports/${encodeURIComponent(reportId)}/comments`
+    ),
+  createReportComment: (reportId: string, message: string) =>
+    request<{ comment: ReportComment }>(
+      `/api/reports/${encodeURIComponent(reportId)}/comments`,
+      {
+        method: "POST",
+        body: JSON.stringify({ message })
+      }
     ),
   sendOffer: (reportId: string, offerType: OfferType, message: string) =>
     request<{ id: string }>(`/api/reports/${encodeURIComponent(reportId)}/offers`, {

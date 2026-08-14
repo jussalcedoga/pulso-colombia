@@ -83,11 +83,27 @@ export async function geocode(env: Env, request: Request): Promise<Response> {
   const query = requiredString(body.query, "La dirección o el barrio", 3, 120);
   const city = enumValue(body.city, CITY_IDS, "La ciudad");
   await enforceRateLimit(env, request, `geocode:${user.id}`, 10, 10 * 60);
-  await enforceGlobalProviderLimit(env);
 
   const selected = CITY_SEARCH[city];
   const [south, west, north, east] = selected.bounds;
   const language = request.headers.get("x-pulso-language") === "en" ? "en" : "es";
+  const cache = (caches as unknown as { default: Cache }).default;
+  const normalizedQuery = query.toLowerCase().replace(/\s+/g, " ").trim();
+  const cacheKey = new Request(
+    `https://pulso.internal/geocode/${city}/${language}?q=${encodeURIComponent(normalizedQuery)}`
+  );
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    return json(await cached.json(), {
+      headers: {
+        "cache-control": "no-store",
+        "x-geocoder": "OpenStreetMap-Nominatim",
+        "x-geocoder-cache": "hit"
+      }
+    });
+  }
+
+  await enforceGlobalProviderLimit(env);
   const params = new URLSearchParams({
     q: `${query}, ${selected.name}, Colombia`,
     format: "jsonv2",
@@ -172,12 +188,20 @@ export async function geocode(env: Env, request: Request): Promise<Response> {
     ];
   });
 
+  const payload = { results };
+  await cache
+    .put(
+      cacheKey,
+      json(payload, { headers: { "cache-control": "public, max-age=21600" } })
+    )
+    .catch(() => undefined);
   return json(
-    { results },
+    payload,
     {
       headers: {
         "cache-control": "no-store",
-        "x-geocoder": "OpenStreetMap-Nominatim"
+        "x-geocoder": "OpenStreetMap-Nominatim",
+        "x-geocoder-cache": "miss"
       }
     }
   );

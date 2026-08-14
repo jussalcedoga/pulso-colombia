@@ -34,6 +34,7 @@ function report(overrides: Partial<Report> = {}): Report {
     id: "rpt_1",
     userId: "usr_1",
     postType: "need",
+    locationMode: "local",
     city: "manizales",
     neighborhood: "Centro",
     h3Cell: "882a107289fffff",

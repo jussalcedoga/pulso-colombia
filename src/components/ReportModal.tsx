@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   CircleAlert,
   Flag,
+  Globe2,
   Handshake,
   HeartHandshake,
   MapPin,
@@ -11,7 +12,7 @@ import {
   UsersRound
 } from "lucide-react";
 import { latLngToCell } from "h3-js";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiRequestError } from "../api";
 import { CITIES, OFFER_TYPES } from "../data";
 import { formatRelativeTime } from "../format";
@@ -22,6 +23,7 @@ import type {
   Language,
   OfferType,
   Report,
+  ReportComment,
   ReportStatus,
   User
 } from "../types";
@@ -79,7 +81,13 @@ export function ReportModal({
   const [flagReason, setFlagReason] = useState("incorrect");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [comments, setComments] = useState<ReportComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [commentMessage, setCommentMessage] = useState("");
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentError, setCommentError] = useState("");
   const city = CITIES.find((item) => item.id === report.city);
+  const cityName = language === "es" ? city?.name : city?.nameEn;
   const mmi = sampleModeledMmi(
     hazards?.shakemap.modeledCells,
     report.latitude,
@@ -93,6 +101,27 @@ export function ReportModal({
       (point) => latLngToCell(point.latitude, point.longitude, 9) === reportCell
     ).length ?? 0;
   const isOwner = user?.id === report.userId;
+
+  useEffect(() => {
+    let active = true;
+    setComments([]);
+    setCommentsLoading(true);
+    setCommentError("");
+    api
+      .reportComments(report.id)
+      .then(({ comments: nextComments }) => {
+        if (active) setComments(nextComments);
+      })
+      .catch(() => {
+        if (active) setCommentError(t("commentsLoadError"));
+      })
+      .finally(() => {
+        if (active) setCommentsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [report.id, t, user?.id]);
 
   const confirm = async () => {
     if (!user) {
@@ -170,6 +199,29 @@ export function ReportModal({
     }
   };
 
+  const publishComment = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!user) {
+      onRequireAuth();
+      return;
+    }
+    const nextMessage = commentMessage.trim();
+    if (!nextMessage) return;
+    setCommentSubmitting(true);
+    setCommentError("");
+    try {
+      const { comment } = await api.createReportComment(report.id, nextMessage);
+      setComments((current) => [...current, comment]);
+      setCommentMessage("");
+    } catch (caught) {
+      setCommentError(
+        caught instanceof ApiRequestError ? caught.message : t("genericError")
+      );
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
+
   return (
     <Modal
       title={
@@ -226,10 +278,20 @@ export function ReportModal({
             </span>
           </div>
           <h3 className="report-detail__location">
-            <MapPin size={20} aria-hidden="true" />
+            {report.locationMode === "remote" ? (
+              <Globe2 size={20} aria-hidden="true" />
+            ) : (
+              <MapPin size={20} aria-hidden="true" />
+            )}
             <span>
-              {report.neighborhood || city?.name}
-              <small>{city?.name} · {t("approximateLocation")}</small>
+              {report.locationMode === "remote"
+                ? t("remoteHelp")
+                : report.neighborhood || cityName}
+              <small>
+                {report.locationMode === "remote"
+                  ? t("supportingCommunity", { city: cityName ?? "" })
+                  : `${cityName} · ${t("approximateLocation")}`}
+              </small>
             </span>
           </h3>
           <p className="report-detail__text">{report.details}</p>
@@ -327,6 +389,83 @@ export function ReportModal({
               <span>{t("fundraiserSafety")}</span>
             </div>
           ) : null}
+          <section className="report-comments" aria-labelledby="report-comments-title">
+            <header>
+              <span>
+                <MessageCircle size={17} aria-hidden="true" />
+                <strong id="report-comments-title">{t("discussion")}</strong>
+              </span>
+              <small>{t("discussionCount", { count: comments.length })}</small>
+            </header>
+            {commentsLoading ? (
+              <p className="report-comments__state" role="status">
+                {t("commentsLoading")}
+              </p>
+            ) : comments.length ? (
+              <ol className="report-comments__list">
+                {comments.map((comment) => (
+                  <li key={comment.id} className={comment.mine ? "is-mine" : ""}>
+                    <div>
+                      <strong>{comment.authorName}</strong>
+                      {comment.authorVerified ? (
+                        <BadgeCheck
+                          size={14}
+                          aria-label={t("verifiedRepresentative")}
+                        />
+                      ) : null}
+                      <time dateTime={comment.createdAt}>
+                        {formatRelativeTime(comment.createdAt, language, t)}
+                      </time>
+                    </div>
+                    <p>{comment.message}</p>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="report-comments__state">{t("noComments")}</p>
+            )}
+            {report.status === "resolved" ? (
+              <p className="report-comments__closed">
+                <CheckCircle2 size={15} aria-hidden="true" />
+                {t("commentsClosed")}
+              </p>
+            ) : user ? (
+              <form className="report-comments__form" onSubmit={publishComment}>
+                <label>
+                  <span className="sr-only">{t("commentPlaceholder")}</span>
+                  <textarea
+                    rows={2}
+                    maxLength={500}
+                    value={commentMessage}
+                    placeholder={t("commentPlaceholder")}
+                    onChange={(event) => setCommentMessage(event.target.value)}
+                    required
+                  />
+                </label>
+                <div>
+                  <small>{t("publicCommentNote")}</small>
+                  <button
+                    className="button button--secondary"
+                    type="submit"
+                    disabled={commentSubmitting || !commentMessage.trim()}
+                  >
+                    {commentSubmitting ? t("publishingComment") : t("publishComment")}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                className="report-comments__signin"
+                type="button"
+                onClick={onRequireAuth}
+              >
+                {t("signInToComment")}
+              </button>
+            )}
+            {commentError ? (
+              <div className="form-error" role="alert">{commentError}</div>
+            ) : null}
+          </section>
           {error ? <div className="form-error" role="alert">{error}</div> : null}
           <div className="report-detail__actions">
             {isOwner ? (

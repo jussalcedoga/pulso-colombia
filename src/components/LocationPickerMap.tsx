@@ -1,6 +1,5 @@
-import { cellToBoundary, latLngToCell } from "h3-js";
-import type { LatLngExpression } from "leaflet";
-import { CircleMarker, MapContainer, Polygon, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import L from "leaflet";
+import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { useEffect } from "react";
 import { cityDefinition, isPointInCityBounds } from "../data";
 import type { CityId } from "../types";
@@ -8,6 +7,7 @@ import type { CityId } from "../types";
 interface LocationPickerMapProps {
   city: CityId;
   location: [number, number] | null;
+  urgency: number;
   label: string;
   onChange: (location: [number, number]) => void;
   onInvalid: () => void;
@@ -52,14 +52,21 @@ function LocationEvents({
 export function LocationPickerMap({
   city,
   location,
+  urgency,
   label,
   onChange,
   onInvalid
 }: LocationPickerMapProps) {
   const definition = cityDefinition(city);
-  const publicCell = location
-    ? (cellToBoundary(latLngToCell(location[0], location[1], 9)) as [number, number][])
-    : [];
+  const severityColors = ["#668aa3", "#3f8f63", "#d39a1e", "#df6b2b", "#c93443"];
+  const pinIcon = L.divIcon({
+    className: "report-marker-wrap",
+    html:
+      `<span class="report-pin" style="--marker-color:${severityColors[urgency - 1]}">` +
+      `<span>${urgency}</span></span>`,
+    iconSize: [36, 44],
+    iconAnchor: [18, 42]
+  });
 
   return (
     <MapContainer
@@ -81,28 +88,8 @@ export function LocationPickerMap({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         maxZoom={19}
       />
-      {publicCell.length ? (
-        <Polygon
-          positions={publicCell as LatLngExpression[]}
-          pathOptions={{
-            color: "#0f6c5b",
-            fillColor: "#32a68c",
-            fillOpacity: 0.16,
-            weight: 2
-          }}
-        />
-      ) : null}
       {location ? (
-        <CircleMarker
-          center={location}
-          radius={7}
-          pathOptions={{
-            color: "#ffffff",
-            fillColor: "#0f6c5b",
-            fillOpacity: 1,
-            weight: 3
-          }}
-        />
+        <Marker position={location} icon={pinIcon} />
       ) : null}
     </MapContainer>
   );

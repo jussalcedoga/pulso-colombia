@@ -27,6 +27,7 @@ import { enforceEdgeRateLimits, verifyTurnstile } from "./security";
 import {
   MAX_ACTIVE_OFFERS_PER_REPORT,
   MAX_CHAT_MESSAGES_PER_OFFER,
+  MAX_COMMENTS_PER_REPORT,
   MAX_REPORTS_PER_USER_PER_DAY,
   runRetentionCleanup
 } from "./storage";
@@ -41,7 +42,8 @@ import {
   OFFER_TYPES,
   optionalString,
   rejectPublicContactInfo,
-  requiredString
+  requiredString,
+  targetCityAnchor
 } from "./validation";
 
 interface RegisterBody {
@@ -57,6 +59,7 @@ interface LoginBody {
 
 interface ReportBody {
   postType?: unknown;
+  locationMode?: unknown;
   city?: unknown;
   neighborhood?: unknown;
   latitude?: unknown;
@@ -74,6 +77,10 @@ interface OfferBody {
 }
 
 interface ChatMessageBody {
+  message?: unknown;
+}
+
+interface ReportCommentBody {
   message?: unknown;
 }
 
@@ -171,7 +178,8 @@ async function listReports(env: Env, request: Request): Promise<Response> {
     if (cached) return cached;
   }
   const query = `
-    SELECT r.id, r.user_id, r.post_type, r.city, r.neighborhood, r.h3_cell, r.latitude, r.longitude,
+    SELECT r.id, r.user_id, r.post_type, r.location_mode, r.city, r.neighborhood,
+           r.h3_cell, r.latitude, r.longitude,
            r.need_types, r.urgency, r.people_count, r.details, r.status,
            r.confirmations, r.created_at, r.updated_at,
            u.display_name, u.account_type, u.role, u.verified
@@ -190,6 +198,7 @@ async function listReports(env: Env, request: Request): Promise<Response> {
     id: row.id,
     userId: row.user_id,
     postType: row.post_type,
+    locationMode: row.location_mode,
     city: row.city,
     neighborhood: row.neighborhood,
     h3Cell: row.h3_cell,
@@ -241,9 +250,18 @@ async function createReport(env: Env, request: Request): Promise<Response> {
     ["need", "offer", "update"] as const,
     "El tipo de publicación"
   );
+  const locationMode =
+    postType === "offer"
+      ? enumValue(
+          body.locationMode ?? "local",
+          ["local", "remote"] as const,
+          "La modalidad de ayuda"
+        )
+      : "local";
   const city = enumValue(body.city, CITY_IDS, "La ciudad");
-  const neighborhood = optionalString(body.neighborhood, 60);
-  const needTypes = enumArray(body.needTypes, NEED_TYPES, "Las necesidades");
+  const neighborhood =
+    locationMode === "remote" ? "" : optionalString(body.neighborhood, 60);
+  const needTypes = enumArray(body.needTypes, NEED_TYPES, "Las necesidades", NEED_TYPES.length);
   const submittedUrgency = integerValue(body.urgency, "La urgencia", 1, 5);
   const submittedPeopleCount = integerValue(
     body.peopleCount,
@@ -260,7 +278,10 @@ async function createReport(env: Env, request: Request): Promise<Response> {
     postType === "update" ? 420 : 700
   );
   rejectPublicContactInfo(`${neighborhood} ${details}`);
-  const location = approximateLocation(body.latitude, body.longitude, city);
+  const location =
+    locationMode === "remote"
+      ? targetCityAnchor(city)
+      : approximateLocation(body.latitude, body.longitude, city);
 
   const reportCounts = await env.DB.prepare(
     `SELECT
@@ -290,14 +311,15 @@ async function createReport(env: Env, request: Request): Promise<Response> {
   const reportId = generateId("rpt");
   await env.DB.prepare(
     `INSERT INTO reports
-      (id, user_id, post_type, city, neighborhood, h3_cell, latitude, longitude, need_types,
-       urgency, people_count, details)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      (id, user_id, post_type, location_mode, city, neighborhood, h3_cell, latitude,
+       longitude, need_types, urgency, people_count, details)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       reportId,
       user.id,
       postType,
+      locationMode,
       city,
       neighborhood,
       location.h3Cell,
@@ -404,6 +426,116 @@ async function flagReport(env: Env, request: Request, reportId: string): Promise
   ]);
   await invalidateReportCache();
   return json({ ok: true, changed: insert.meta.changes > 0 });
+}
+
+async function listReportComments(
+  env: Env,
+  request: Request,
+  reportId: string
+): Promise<Response> {
+  const viewer = await getSessionUser(env, request);
+  const report = await env.DB.prepare(
+    "SELECT id FROM reports WHERE id = ? AND flags < 3"
+  )
+    .bind(reportId)
+    .first<{ id: string }>();
+  if (!report) {
+    throw new HttpError(404, "report_not_found", "No se encontró la publicación.");
+  }
+
+  const result = await env.DB.prepare(
+    `SELECT c.id, c.report_id, c.user_id, c.message, c.created_at,
+            u.display_name, u.verified
+       FROM report_comments c
+       JOIN users u ON u.id = c.user_id
+      WHERE c.report_id = ?
+      ORDER BY c.id ASC
+      LIMIT ?`
+  )
+    .bind(reportId, MAX_COMMENTS_PER_REPORT)
+    .all<{
+      id: number;
+      report_id: string;
+      user_id: string;
+      message: string;
+      created_at: string;
+      display_name: string;
+      verified: number;
+    }>();
+
+  return json(
+    {
+      comments: result.results.map((row) => ({
+        id: row.id,
+        reportId: row.report_id,
+        authorName: row.display_name,
+        authorVerified: row.verified === 1,
+        message: row.message,
+        createdAt: row.created_at,
+        mine: row.user_id === viewer?.id
+      }))
+    },
+    { headers: { "cache-control": "no-store" } }
+  );
+}
+
+async function createReportComment(
+  env: Env,
+  request: Request,
+  reportId: string
+): Promise<Response> {
+  const user = await requireUser(env, request);
+  await enforceRateLimit(env, request, `comment:${user.id}`, 60, 60 * 60);
+  const body = await readJson<ReportCommentBody>(request);
+  const message = requiredString(body.message, "El comentario", 1, 500);
+  rejectPublicContactInfo(message);
+
+  const report = await env.DB.prepare(
+    "SELECT status FROM reports WHERE id = ? AND flags < 3"
+  )
+    .bind(reportId)
+    .first<{ status: string }>();
+  if (!report) {
+    throw new HttpError(404, "report_not_found", "No se encontró la publicación.");
+  }
+  if (report.status === "resolved") {
+    throw new HttpError(
+      409,
+      "comments_closed",
+      "La conversación está cerrada porque la publicación fue resuelta."
+    );
+  }
+
+  const inserted = await env.DB.prepare(
+    `INSERT INTO report_comments (report_id, user_id, message)
+     SELECT ?, ?, ?
+      WHERE (SELECT COUNT(*) FROM report_comments WHERE report_id = ?) < ?
+     RETURNING id, created_at`
+  )
+    .bind(reportId, user.id, message, reportId, MAX_COMMENTS_PER_REPORT)
+    .first<{ id: number; created_at: string }>();
+  if (!inserted) {
+    throw new HttpError(
+      409,
+      "comment_capacity",
+      "Esta conversación alcanzó su límite de comentarios."
+    );
+  }
+
+  return json(
+    {
+      comment: {
+        id: inserted.id,
+        reportId,
+        authorName: user.displayName,
+        authorVerified: user.verified,
+        message,
+        createdAt: inserted.created_at,
+        mine: true
+      }
+    },
+    { status: 201, headers: { "cache-control": "no-store" } }
+  );
 }
 
 async function createOffer(
@@ -703,6 +835,13 @@ async function handleApi(env: Env, request: Request): Promise<Response> {
   if (method === "POST" && confirmId) return confirmReport(env, request, confirmId);
   const flagId = routeId(pathname, "/api/reports/", "/flag");
   if (method === "POST" && flagId) return flagReport(env, request, flagId);
+  const commentReportId = routeId(pathname, "/api/reports/", "/comments");
+  if (method === "GET" && commentReportId) {
+    return listReportComments(env, request, commentReportId);
+  }
+  if (method === "POST" && commentReportId) {
+    return createReportComment(env, request, commentReportId);
+  }
   const offerReportId = routeId(pathname, "/api/reports/", "/offers");
   if (method === "POST" && offerReportId) return createOffer(env, request, offerReportId);
   const chatOfferId = routeId(pathname, "/api/offers/", "/messages");

@@ -117,7 +117,7 @@ export function AuthModal({
               <small>{t("displayNameHint")}</small>
             </label>
             <label className="field">
-              <span>{t("yourCity")}</span>
+              <span>{t("primaryCommunity")}</span>
               <select value={city} onChange={(event) => setCity(event.target.value as CityId)}>
                 {CITIES.map((item) => (
                   <option key={item.id} value={item.id}>
@@ -125,6 +125,7 @@ export function AuthModal({
                   </option>
                 ))}
               </select>
+              <small>{t("primaryCommunityNote")}</small>
             </label>
             <fieldset className="field">
               <legend>{t("accountType")}</legend>

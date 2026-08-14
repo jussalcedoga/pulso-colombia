@@ -1,6 +1,7 @@
 export type Language = "es" | "en";
 export type CityId = "manizales" | "pereira" | "armenia" | "cali" | "choco";
 export type PostType = "need" | "offer" | "update";
+export type LocationMode = "local" | "remote";
 export type NeedType =
   | "water"
   | "food"
@@ -35,6 +36,7 @@ export interface Report {
   id: string;
   userId: string;
   postType: PostType;
+  locationMode: LocationMode;
   city: CityId;
   neighborhood: string;
   h3Cell: string;
@@ -87,6 +89,16 @@ export interface ChatMessage {
   offerId: string;
   senderId: string;
   senderName: string;
+  message: string;
+  createdAt: string;
+  mine: boolean;
+}
+
+export interface ReportComment {
+  id: number;
+  reportId: string;
+  authorName: string;
+  authorVerified: boolean;
   message: string;
   createdAt: string;
   mine: boolean;

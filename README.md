@@ -48,12 +48,17 @@ posts, and separate **Necesito ayuda / I need help** and
   Copernicus findings, and community needs visually and mathematically distinct.
 - Separates **needs**, **available help**, and **community updates**. Only needs
   affect the response-priority model.
-- Lets signed-in users search for an address or drop a pin, then publishes at
-  H3 resolution 9. The submitted coordinate is discarded; only the center of an
-  approximately 350 m-wide cell is stored.
+- Lets local helpers publish an approximate map pin and lets helpers abroad
+  offer remote support to a selected community without sharing their location.
+- Lets signed-in users localize a post by address search or dropped pin, then
+  publishes at H3 resolution 9. The submitted coordinate is discarded; only
+  the center of an approximately 350 m-wide cell is stored. Remote-help posts
+  do not request the helper's location.
 - Supports recovery-code accounts with no email vendor or password database.
 - Lets signed-in people confirm nearby needs, flag unsafe posts, send private
   offers, accept/decline them, and chat after an offer is accepted.
+- Gives every need, available-help post, and community update a lightweight
+  public discussion; only the author can resolve or reopen their post.
 - Links only to configured official organization domains. Pulso does not process
   money or charge fees.
 - Runs as a Cloudflare Worker with static assets and D1 on the free tier.
@@ -169,14 +174,17 @@ performed the check outside Pulso.
 
 ## Privacy And Abuse Controls
 
-- Public reports reject phone numbers and email addresses.
+- Public reports and comments reject phone numbers and email addresses.
 - Exact submitted coordinates are never stored.
 - Offers and replies require authentication and are private to both parties.
 - Public posts disappear after three independent flags pending operator review.
 - Every API request has an edge limit; writes have a stricter edge limit.
-- Registration, login, reports, offers, and chat also have D1-backed limits.
+- Registration, login, reports, comments, offers, and chat also have D1-backed
+  limits.
 - Accounts can keep five unresolved posts and create at most 25 posts per day.
 - Chats are capped at 500 compact text messages with 30-day retention.
+- Discussions are capped at 200 compact comments per post with 30-day
+  retention.
 - Closed and stale community data is removed by a daily retention job.
 - Sessions use hashed bearer tokens in `HttpOnly`, `SameSite=Lax` cookies.
 - Security headers and a restrictive CSP are applied to API and static assets.
