@@ -61,7 +61,8 @@ posting requires an account. Resolved posts and their discussions leave public
 APIs. Only the single operator-assigned `moderator` account may resolve or
 reopen a post, or permanently delete it; post authors cannot change closure
 state. A permanent delete cascades to the post's public comments, confirmations,
-flags, private connections, and chat messages.
+flags, private connections, and chat messages. The moderator header exposes a
+dedicated active-post management view; server authorization remains authoritative.
 
 Available-help posts explicitly distinguish local and remote support. Local
 help stores and displays an approximate pin. Remote help is associated with a

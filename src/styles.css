@@ -258,11 +258,18 @@ p {
   border-radius: 5px;
 }
 
-.header-action--inbox {
+.header-action--inbox,
+.header-action--admin {
   display: inline-flex;
   width: auto;
   min-width: 36px;
   padding: 0 10px;
+}
+
+.header-action--admin {
+  color: var(--give-dark);
+  background: var(--give-soft);
+  border-color: #b9ddd3;
 }
 
 .header-action__label {
@@ -2356,6 +2363,105 @@ p {
   font-size: 10px;
 }
 
+.admin-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 14px;
+  color: var(--give-dark);
+}
+
+.admin-intro svg {
+  flex: none;
+}
+
+.admin-intro p {
+  margin: 1px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.admin-report-list {
+  border-top: 1px solid var(--line);
+}
+
+.admin-report {
+  position: relative;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-report > header,
+.admin-report__meta,
+.admin-report__confirm,
+.admin-report__confirm > div {
+  display: flex;
+  align-items: center;
+}
+
+.admin-report > header {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-report > header time {
+  color: var(--faint);
+  font-size: 9px;
+}
+
+.admin-report > p {
+  margin: 8px 0;
+  padding-right: 84px;
+  color: #3d484f;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.admin-report__meta {
+  gap: 14px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.admin-report__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.admin-report__delete {
+  position: absolute;
+  right: 0;
+  bottom: 14px;
+  gap: 5px;
+}
+
+.admin-report__confirm {
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  color: #6e4247;
+  font-size: 9px;
+  line-height: 1.4;
+  background: var(--danger-soft);
+  border: 1px solid #efc4c9;
+  border-radius: 5px;
+}
+
+.admin-report__confirm > div {
+  flex: none;
+  gap: 7px;
+}
+
+.admin-report__confirm .button {
+  min-height: 32px;
+  padding: 0 9px;
+  font-size: 9px;
+}
+
 .report-comments {
   margin: 16px 0;
   padding-top: 14px;
@@ -3644,7 +3750,8 @@ p {
     padding: 0;
   }
 
-  .header-action--inbox {
+  .header-action--inbox,
+  .header-action--admin {
     width: 36px;
     padding: 0;
   }
@@ -3925,6 +4032,29 @@ p {
 
   .inbox-device-note {
     margin-left: 0;
+  }
+
+  .admin-report > p {
+    padding-right: 0;
+  }
+
+  .admin-report__delete {
+    position: static;
+    margin-top: 10px;
+  }
+
+  .admin-report__confirm {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-report__confirm > div {
+    width: 100%;
+    flex-direction: column-reverse;
+  }
+
+  .admin-report__confirm .button {
+    width: 100%;
   }
 
   .inbox-list {

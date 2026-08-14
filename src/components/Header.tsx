@@ -4,7 +4,8 @@ import {
   LogOut,
   Mail,
   PhoneCall,
-  Radio
+  Radio,
+  ShieldCheck
 } from "lucide-react";
 import type { TFunction } from "../i18n";
 import type { HazardResponse, Language, User } from "../types";
@@ -19,6 +20,7 @@ interface HeaderProps {
   onAuth: () => void;
   onLogout: () => void;
   onInbox: () => void;
+  onAdmin: () => void;
 }
 
 export function Header({
@@ -30,7 +32,8 @@ export function Header({
   onLanguageChange,
   onAuth,
   onLogout,
-  onInbox
+  onInbox,
+  onAdmin
 }: HeaderProps) {
   return (
     <>
@@ -74,17 +77,31 @@ export function Header({
             <span>{t("emergency")}</span>
           </a>
           {user ? (
-            <button
-              className="header-action header-action--inbox"
-              type="button"
-              onClick={onInbox}
-              aria-label={inboxCount ? t("messagesCount", { count: inboxCount }) : t("inbox")}
-              title={t("inbox")}
-            >
-              <Mail size={19} aria-hidden="true" />
-              <span className="header-action__label">{t("inbox")}</span>
-              {inboxCount > 0 ? <span className="notification-count">{Math.min(99, inboxCount)}</span> : null}
-            </button>
+            <>
+              {user.role === "moderator" ? (
+                <button
+                  className="header-action header-action--admin"
+                  type="button"
+                  onClick={onAdmin}
+                  aria-label={t("admin")}
+                  title={t("admin")}
+                >
+                  <ShieldCheck size={19} aria-hidden="true" />
+                  <span className="header-action__label">{t("admin")}</span>
+                </button>
+              ) : null}
+              <button
+                className="header-action header-action--inbox"
+                type="button"
+                onClick={onInbox}
+                aria-label={inboxCount ? t("messagesCount", { count: inboxCount }) : t("inbox")}
+                title={t("inbox")}
+              >
+                <Mail size={19} aria-hidden="true" />
+                <span className="header-action__label">{t("inbox")}</span>
+                {inboxCount > 0 ? <span className="notification-count">{Math.min(99, inboxCount)}</span> : null}
+              </button>
+            </>
           ) : null}
           <div className="language-switch" role="group" aria-label={t("language")}>
             <Languages size={17} aria-hidden="true" />

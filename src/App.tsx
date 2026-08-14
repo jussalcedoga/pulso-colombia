@@ -19,6 +19,9 @@ import { SidePanel } from "./components/SidePanel";
 const AuthModal = lazy(() =>
   import("./components/AuthModal").then((module) => ({ default: module.AuthModal }))
 );
+const AdminModal = lazy(() =>
+  import("./components/AdminModal").then((module) => ({ default: module.AdminModal }))
+);
 const DonateModal = lazy(() =>
   import("./components/DonateModal").then((module) => ({ default: module.DonateModal }))
 );
@@ -38,7 +41,7 @@ const SourcesModal = lazy(() =>
   import("./components/SourcesModal").then((module) => ({ default: module.SourcesModal }))
 );
 
-type ActiveModal = "auth" | "need" | "donate" | "inbox" | "sources" | null;
+type ActiveModal = "auth" | "need" | "donate" | "inbox" | "sources" | "admin" | null;
 type PanelTab = "needs" | "areas" | "resources";
 
 export default function App() {
@@ -240,6 +243,7 @@ export default function App() {
         onAuth={() => setActiveModal("auth")}
         onLogout={() => void logout()}
         onInbox={openInbox}
+        onAdmin={() => setActiveModal("admin")}
       />
       {!online ? (
         <div className="connection-banner connection-banner--offline" role="status">
@@ -380,6 +384,18 @@ export default function App() {
             onRefresh={() => void loadInbox(true)}
             onClose={() => setActiveModal(null)}
             onChanged={(message) => void refreshAfterChange(message, false)}
+          />
+        ) : null}
+        {activeModal === "admin" && user?.role === "moderator" ? (
+          <AdminModal
+            t={t}
+            language={language}
+            reports={reports}
+            onClose={() => setActiveModal(null)}
+            onDeleted={async (message) => {
+              setToast(message);
+              await loadPublicData();
+            }}
           />
         ) : null}
         {selectedReport && activeModal === null && !recoveryCode ? (
