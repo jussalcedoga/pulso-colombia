@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a reproducible product or data-integrity problem
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include recovery codes, private messages, precise locations, or security vulnerabilities. Use private vulnerability reporting for security issues.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Map or satellite layers
+        - Priority model
+        - Community posts
+        - Connection or chat
+        - Authentication
+        - Translation
+        - Accessibility or responsive layout
+        - Deployment
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Give minimal steps without including personal or sensitive data.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+  - type: dropdown
+    id: language
+    attributes:
+      label: Interface language
+      options:
+        - Espanol
+        - English
+        - Both
+    validations:
+      required: true

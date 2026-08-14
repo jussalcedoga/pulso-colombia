@@ -1,0 +1,31 @@
+name: Feature request
+description: Propose a focused improvement for the emergency-response pilot
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Community need
+      description: Which user and emergency-response problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and data source
+      description: Include provenance and limitations for model or hazard-data changes.
+  - type: textarea
+    id: impact
+    attributes:
+      label: Safety, privacy, and operating impact
+      description: Cover location precision, retention, abuse, translations, and Cloudflare usage.
+    validations:
+      required: true
