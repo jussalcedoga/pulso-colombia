@@ -69,7 +69,7 @@ export function applySecurityHeaders(response: Response): Response {
       "default-src 'self'",
       "script-src 'self' https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://gibs.earthdata.nasa.gov https://earthquake.usgs.gov",
+      "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://*.arcgisonline.com https://gibs.earthdata.nasa.gov https://earthquake.usgs.gov",
       "connect-src 'self' https://challenges.cloudflare.com",
       "frame-src https://challenges.cloudflare.com",
       "font-src 'self' data:",

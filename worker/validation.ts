@@ -23,6 +23,17 @@ export const OFFER_TYPES = [
   "other"
 ] as const;
 
+const CITY_BOUNDS: Record<
+  (typeof CITY_IDS)[number],
+  [south: number, west: number, north: number, east: number]
+> = {
+  manizales: [4.99, -75.61, 5.16, -75.4],
+  pereira: [4.71, -75.82, 4.91, -75.59],
+  armenia: [4.44, -75.79, 4.64, -75.58],
+  cali: [3.28, -76.67, 3.61, -76.39],
+  choco: [5.59, -76.78, 5.81, -76.54]
+};
+
 export function requiredString(
   value: unknown,
   label: string,
@@ -97,7 +108,8 @@ export function enumArray<T extends readonly string[]>(
 
 export function approximateLocation(
   latitudeValue: unknown,
-  longitudeValue: unknown
+  longitudeValue: unknown,
+  city?: (typeof CITY_IDS)[number]
 ): { h3Cell: string; latitude: number; longitude: number } {
   const latitude = Number(latitudeValue);
   const longitude = Number(longitudeValue);
@@ -111,7 +123,17 @@ export function approximateLocation(
   ) {
     throw new HttpError(422, "invalid_location", "Selecciona una ubicación válida en Colombia.");
   }
-  const h3Cell = latLngToCell(latitude, longitude, 8);
+  if (city) {
+    const [south, west, north, east] = CITY_BOUNDS[city];
+    if (latitude < south || latitude > north || longitude < west || longitude > east) {
+      throw new HttpError(
+        422,
+        "location_outside_city",
+        "La ubicación debe estar dentro de la ciudad o región seleccionada."
+      );
+    }
+  }
+  const h3Cell = latLngToCell(latitude, longitude, 9);
   const [cellLatitude, cellLongitude] = cellToLatLng(h3Cell);
   return {
     h3Cell,

@@ -10,12 +10,13 @@ import {
   ShieldAlert,
   UsersRound
 } from "lucide-react";
+import { latLngToCell } from "h3-js";
 import { useState, type FormEvent } from "react";
 import { api, ApiRequestError } from "../api";
 import { CITIES, OFFER_TYPES } from "../data";
 import { formatRelativeTime } from "../format";
 import type { TFunction } from "../i18n";
-import { reportPriority, sampleMmi } from "../scoring";
+import { sampleModeledMmi } from "../scoring";
 import type {
   HazardResponse,
   Language,
@@ -79,8 +80,18 @@ export function ReportModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const city = CITIES.find((item) => item.id === report.city);
-  const mmi = sampleMmi(hazards?.shakemap.grid, report.latitude, report.longitude);
-  const priority = reportPriority(report, hazards?.shakemap.grid);
+  const mmi = sampleModeledMmi(
+    hazards?.shakemap.modeledCells,
+    report.latitude,
+    report.longitude
+  );
+  const reportCell = latLngToCell(report.latitude, report.longitude, 9);
+  const officialFindings = hazards?.copernicus.areas
+    .filter((area) => area.city === report.city)
+    .flatMap((area) => area.damagePoints)
+    .filter(
+      (point) => latLngToCell(point.latitude, point.longitude, 9) === reportCell
+    ).length ?? 0;
   const isOwner = user?.id === report.userId;
 
   const confirm = async () => {
@@ -290,15 +301,15 @@ export function ReportModal({
                 <div>
                   <span>{t("officialIntensity")}</span>
                   <strong>{mmi == null ? "-" : `MMI ${mmi}`}</strong>
-                  <small>USGS ShakeMap</small>
+                  <small>{t("modeledNotDamage")}</small>
                 </div>
                 <div>
-                  <span>{t("prioritySignal")}</span>
-                  <strong>{priority}<small>/100</small></strong>
-                  <small>{t("evidenceOfficial")} + {t("evidenceCommunity")}</small>
+                  <span>{t("officialMappedDamage")}</span>
+                  <strong>{officialFindings}</strong>
+                  <small>{t("findingsInPublicCell")}</small>
                 </div>
               </div>
-              <p className="evidence-disclaimer">{t("priorityNote")}</p>
+              <p className="evidence-disclaimer">{t("reportEvidenceDisclaimer")}</p>
             </>
           ) : (
             <div className="offer-form-context offer-form-context--detail">

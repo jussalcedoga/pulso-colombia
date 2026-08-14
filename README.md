@@ -37,13 +37,20 @@ needs, priority ranking, and separate **Necesito ayuda / I need help** and
 
 - Reads the configured event, aftershocks, ShakeMap intensity, and ground-failure
   alerts from the USGS.
-- Displays dated NASA GIBS/VIIRS daily imagery without an API key.
-- Ranks Manizales, Pereira, Armenia, Cali, and Chocó/Quibdó using official MMI
-  plus open community need reports.
+- Displays labeled Esri reference imagery and optional dated NASA GIBS/VIIRS
+  daily imagery without an API key.
+- Loads official Copernicus EMSR916 building-damage findings, interrupted-road
+  points, analyzed-area boundaries, sensor names, and delivery timestamps.
+- Provides city and neighborhood/sector views for Manizales, Pereira, Armenia,
+  Cali, and Chocó/Quibdó. Areas without final Copernicus coverage are explicitly
+  marked pending rather than treated as undamaged.
+- Keeps modeled USGS MMI, observed USGS "Felt It?" responses, official
+  Copernicus findings, and community needs visually and mathematically distinct.
 - Separates **needs**, **available help**, and **community updates**. Only needs
   affect the response-priority model.
-- Publishes posts at H3 resolution 8. The precise submitted coordinate is
-  discarded; only the center of an approximately 1 km-wide cell is stored.
+- Lets signed-in users search for an address or drop a pin, then publishes at
+  H3 resolution 9. The submitted coordinate is discarded; only the center of an
+  approximately 350 m-wide cell is stored.
 - Supports recovery-code accounts with no email vendor or password database.
 - Lets signed-in people confirm nearby needs, flag unsafe posts, send private
   offers, accept/decline them, and chat after an offer is accepted.
@@ -53,17 +60,23 @@ needs, priority ranking, and separate **Necesito ayuda / I need help** and
 
 ## Data Integrity
 
-Pulso does **not** claim to detect building damage from imagery. The app keeps
-three evidence types distinct:
+Pulso does **not** run its own automatic damage detector. The app keeps four
+evidence types distinct:
 
-1. **USGS:** Instrumental shaking, event status, aftershocks, and ground-failure
-   products.
-2. **NASA GIBS/VIIRS:** Daily context imagery at roughly 375 m source
+1. **Copernicus EMSR916:** Official building classifications and road
+   interruptions produced through photo-interpretation of very-high-resolution
+   imagery, only inside published analyzed areas.
+2. **USGS:** Modeled ShakeMap intensity, observed "Felt It?" responses, event
+   status, aftershocks, and ground-failure products.
+3. **NASA GIBS/VIIRS:** Daily context imagery at roughly 375 m source
    resolution. Clouds and vegetation can hide damage.
-3. **Community:** Stated urgency, affected people, confirmations, and aid status.
+4. **Community:** Stated urgency, affected people, confirmations, and aid status.
 
-The priority index is a triage signal, not an engineering inspection. Resource
-allocation should be verified on the ground. See
+Neighborhood ordering is a transparent triage signal, not an engineering
+inspection. It weights published Copernicus findings most heavily, then open
+critical needs, then modeled shaking. The interface exposes those components
+instead of presenting a false damage percentage. Resource allocation should be
+verified on the ground. See
 [Architecture](docs/ARCHITECTURE.md) for the model and evidence boundaries.
 
 ## Local Run

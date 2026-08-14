@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   physicalImpactProxy,
   rankCities,
+  rankLocalAreas,
   reportPriority,
   sampleMmi,
   scoreColor,
   summarizeCells
 } from "./scoring";
-import type { HazardResponse, MmiGrid, Report } from "./types";
+import type { HazardResponse, MmiEvidenceCell, MmiGrid, Report } from "./types";
 
 const grid: MmiGrid = {
   x: { start: -77, stop: -75, num: 3 },
@@ -18,6 +19,15 @@ const grid: MmiGrid = {
     6, 7, 8
   ]
 };
+
+const modeledCells: MmiEvidenceCell[] = [
+  {
+    id: "mmi-manizales-1",
+    city: "manizales",
+    bounds: [4.5, -76.5, 5.5, -75.5],
+    mmi: 6
+  }
+];
 
 function report(overrides: Partial<Report> = {}): Report {
   return {
@@ -57,9 +67,12 @@ describe("sampleMmi", () => {
 
 describe("reportPriority", () => {
   it("raises priority with urgency and confirmations while reducing resolved reports", () => {
-    const open = reportPriority(report(), grid);
-    const resolved = reportPriority(report({ status: "resolved" }), grid);
-    const critical = reportPriority(report({ urgency: 5, confirmations: 10 }), grid);
+    const open = reportPriority(report(), modeledCells);
+    const resolved = reportPriority(report({ status: "resolved" }), modeledCells);
+    const critical = reportPriority(
+      report({ urgency: 5, confirmations: 10 }),
+      modeledCells
+    );
     expect(open).toBeGreaterThan(resolved);
     expect(critical).toBeGreaterThan(open);
     expect(critical).toBeLessThanOrEqual(100);
@@ -89,7 +102,7 @@ describe("summarizeCells", () => {
           urgency: 5
         })
       ],
-      grid
+      modeledCells
     );
     expect(cells).toHaveLength(1);
     expect(cells[0].reportCount).toBe(2);
@@ -105,7 +118,7 @@ describe("rankCities", () => {
         { id: "manizales", name: "Manizales", latitude: 5, longitude: -76, mmi: 6 },
         { id: "cali", name: "Cali", latitude: 3.4, longitude: -76.5, mmi: 4 }
       ]
-    } as HazardResponse;
+    } as unknown as HazardResponse;
     const ranked = rankCities(hazards, [report()]);
     expect(ranked[0].id).toBe("manizales");
     expect(ranked[0].openReports).toBe(1);
@@ -117,7 +130,7 @@ describe("rankCities", () => {
       cities: [
         { id: "manizales", name: "Manizales", latitude: 5, longitude: -76, mmi: 5 }
       ]
-    } as HazardResponse;
+    } as unknown as HazardResponse;
     const baseline = rankCities(hazards, [])[0];
     const withOffer = rankCities(
       hazards,
@@ -133,5 +146,39 @@ describe("scoreColor", () => {
   it("uses stable severity colors", () => {
     expect(scoreColor(90)).toBe("#c62f3b");
     expect(scoreColor(10)).toBe("#668aa3");
+  });
+});
+
+describe("rankLocalAreas", () => {
+  it("ranks official mapped damage separately from community needs", () => {
+    const hazards = {
+      shakemap: { modeledCells },
+      dyfi: { cells: [] },
+      copernicus: {
+        areas: [
+          {
+            id: "aoi",
+            city: "manizales",
+            name: "Centro",
+            damagePoints: [
+              {
+                id: "damage-1",
+                city: "manizales",
+                latitude: 5,
+                longitude: -76,
+                classification: "destroyed",
+                method: "Photo-interpretation"
+              }
+            ],
+            roadBlocks: []
+          }
+        ]
+      }
+    } as unknown as HazardResponse;
+    const ranked = rankLocalAreas("manizales", hazards, [report()]);
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0].destroyed).toBe(1);
+    expect(ranked[0].openReports).toBe(1);
+    expect(ranked[0].neighborhood).toBe("Centro");
   });
 });

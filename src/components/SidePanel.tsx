@@ -5,16 +5,17 @@ import {
   CircleAlert,
   HeartHandshake,
   ListFilter,
+  MapPin,
   MapPinned,
   MessageSquarePlus,
   Radio,
   ShieldCheck
 } from "lucide-react";
+import { useState } from "react";
 import { CITIES, NEED_TYPES, OFFICIAL_INFORMATION } from "../data";
 import { formatNumber, formatRelativeTime } from "../format";
 import type { TFunction } from "../i18n";
-import type { CityPriority } from "../scoring";
-import { scoreColor } from "../scoring";
+import type { LocalAreaPriority } from "../scoring";
 import type {
   CityId,
   HazardResponse,
@@ -30,14 +31,14 @@ type PanelTab = "needs" | "areas" | "resources";
 interface SidePanelProps {
   t: TFunction;
   language: Language;
-  selectedCity: CityId | "all";
+  selectedCity: CityId;
   selectedNeed: NeedType | "all";
   selectedPostType: PostType | "all";
   tab: PanelTab;
   reports: Report[];
   hazards: HazardResponse | null;
-  cityPriorities: CityPriority[];
-  onCityChange: (city: CityId | "all") => void;
+  localAreas: LocalAreaPriority[];
+  onCityChange: (city: CityId) => void;
   onNeedChange: (need: NeedType | "all") => void;
   onPostTypeChange: (postType: PostType | "all") => void;
   onTabChange: (tab: PanelTab) => void;
@@ -45,7 +46,7 @@ interface SidePanelProps {
   onOfferHelp: () => void;
   onPostUpdate: () => void;
   onReportSelect: (report: Report) => void;
-  onCityFocus: (city: CityId) => void;
+  onAreaFocus: (latitude: number, longitude: number) => void;
   onSources: () => void;
 }
 
@@ -74,7 +75,7 @@ export function SidePanel({
   tab,
   reports,
   hazards,
-  cityPriorities,
+  localAreas,
   onCityChange,
   onNeedChange,
   onPostTypeChange,
@@ -83,15 +84,41 @@ export function SidePanel({
   onOfferHelp,
   onPostUpdate,
   onReportSelect,
-  onCityFocus,
+  onAreaFocus,
   onSources
 }: SidePanelProps) {
+  const [localEvidenceFilter, setLocalEvidenceFilter] = useState<
+    "all" | "official" | "community"
+  >("all");
   const openReports = reports.filter((report) => report.status === "open");
   const filteredReports = reports.filter(
     (report) =>
       (selectedPostType === "all" || report.postType === selectedPostType) &&
       (selectedNeed === "all" || report.needTypes.includes(selectedNeed))
   );
+  const selectedOfficialAreas =
+    hazards?.copernicus.areas.filter((area) => area.city === selectedCity) ?? [];
+  const officialPoints = selectedOfficialAreas.flatMap((area) => area.damagePoints);
+  const destroyedBuildings = officialPoints.filter(
+    (point) => point.classification === "destroyed"
+  ).length;
+  const damagedBuildings = officialPoints.filter(
+    (point) => point.classification === "damaged"
+  ).length;
+  const possiblyDamagedBuildings = officialPoints.filter(
+    (point) => point.classification === "possibly_damaged"
+  ).length;
+  const mappedRoadBlocks = selectedOfficialAreas.reduce(
+    (sum, area) => sum + area.roadBlocks.length,
+    0
+  );
+  const visibleLocalAreas = localAreas.filter((area) => {
+    if (localEvidenceFilter === "official") {
+      return area.destroyed + area.damaged + area.possiblyDamaged + area.roadBlocks > 0;
+    }
+    if (localEvidenceFilter === "community") return area.openReports > 0;
+    return true;
+  });
 
   return (
     <aside className="side-panel" id="community-feed">
@@ -173,9 +200,8 @@ export function SidePanel({
           <MapPinned size={17} aria-hidden="true" />
           <select
             value={selectedCity}
-            onChange={(event) => onCityChange(event.target.value as CityId | "all")}
+            onChange={(event) => onCityChange(event.target.value as CityId)}
           >
-            <option value="all">{t("allCities")}</option>
             {CITIES.map((city) => (
               <option key={city.id} value={city.id}>
                 {language === "es" ? city.name : city.nameEn}
@@ -364,42 +390,149 @@ export function SidePanel({
       ) : null}
 
       {tab === "areas" ? (
-        <div className="area-list">
+        <div className="area-list local-area-list">
           <div className="method-note">
-            <strong>{t("prioritySignal")}</strong>
-            <p>{t("priorityNote")}</p>
+            <strong>{t("neighborhoodEvidence")}</strong>
+            <p>{t("neighborhoodEvidenceNote")}</p>
+            <div className="coverage-status">
+              <ShieldCheck size={15} aria-hidden="true" />
+              {hazards?.copernicus.areas.some((area) => area.city === selectedCity)
+                ? t("officialCoverageAvailable")
+                : t("officialMappingPending")}
+            </div>
             <button type="button" className="text-button" onClick={onSources}>
               {t("liveSources")}
             </button>
           </div>
-          {cityPriorities.map((city, index) => (
+          <div className="local-stats-grid" aria-label={t("interactiveStats")}>
+            <div>
+              <strong>{formatNumber(destroyedBuildings, language)}</strong>
+              <span>{t("destroyedBuildings")}</span>
+            </div>
+            <div>
+              <strong>{formatNumber(damagedBuildings, language)}</strong>
+              <span>{t("damagedBuildings")}</span>
+            </div>
+            <div>
+              <strong>{formatNumber(possiblyDamagedBuildings, language)}</strong>
+              <span>{t("possiblyDamagedBuildings")}</span>
+            </div>
+            <div>
+              <strong>{formatNumber(openReports.length, language)}</strong>
+              <span>{t("communityNeeds")}</span>
+            </div>
+          </div>
+          {mappedRoadBlocks ? (
+            <div className="road-stat">
+              <CircleAlert size={15} aria-hidden="true" />
+              {t("blockedRoadsCount", { count: mappedRoadBlocks })}
+            </div>
+          ) : null}
+          <div className="local-evidence-filter" role="group" aria-label={t("filters")}>
             <button
-              key={city.id}
               type="button"
-              className="area-row"
-              onClick={() => onCityFocus(city.id)}
+              className={localEvidenceFilter === "all" ? "is-active" : ""}
+              onClick={() => setLocalEvidenceFilter("all")}
             >
-              <span className="area-row__rank">{index + 1}</span>
-              <span className="area-row__main">
-                <span>
-                  <strong>{city.name}</strong>
-                  <span>{city.mmi != null ? t("mmiLabel", { value: city.mmi }) : t("noOfficialMmi")}</span>
-                </span>
-                <span className="priority-bar" aria-label={`${t("prioritySignal")} ${city.score}`}>
-                  <span style={{ width: `${city.score}%`, background: scoreColor(city.score) }} />
-                </span>
-                <span className="area-row__stats">
-                  <span>{city.openReports === 1 ? t("oneReport") : t("reportsLabel", { count: city.openReports })}</span>
-                  {city.affectedPeople > 0 ? (
-                    <span>{t("people", { count: formatNumber(city.affectedPeople, language) })}</span>
-                  ) : null}
-                </span>
-              </span>
-              <span className="area-score" style={{ color: scoreColor(city.score) }}>
-                {city.score}
-              </span>
+              {t("filterAll")}
             </button>
-          ))}
+            <button
+              type="button"
+              className={localEvidenceFilter === "official" ? "is-active" : ""}
+              onClick={() => setLocalEvidenceFilter("official")}
+            >
+              {t("officialMappedDamage")}
+            </button>
+            <button
+              type="button"
+              className={localEvidenceFilter === "community" ? "is-active" : ""}
+              onClick={() => setLocalEvidenceFilter("community")}
+            >
+              {t("communityNeeds")}
+            </button>
+          </div>
+          {visibleLocalAreas.length ? (
+            visibleLocalAreas.slice(0, 30).map((area, index) => (
+              <button
+                key={area.id}
+                type="button"
+                className="local-area-row"
+                onClick={() => onAreaFocus(area.latitude, area.longitude)}
+              >
+                <span className="area-row__rank">{index + 1}</span>
+                <span className="local-area-row__main">
+                  <span className="local-area-row__heading">
+                    <strong>
+                      {area.neighborhood ||
+                        t("mappedSector", { count: index + 1 })}
+                    </strong>
+                    <span className={`priority-band priority-band--${area.priorityBand}`}>
+                      {area.priorityBand === "critical"
+                        ? t("priorityCritical")
+                        : area.priorityBand === "high"
+                          ? t("priorityHigh")
+                          : t("priorityActive")}
+                    </span>
+                  </span>
+                  {area.officialAreaName ? (
+                    <small>{area.officialAreaName} · Copernicus EMSR916</small>
+                  ) : null}
+                  <span className="local-evidence-counts">
+                    {area.destroyed ? (
+                      <span className="damage-count damage-count--destroyed">
+                        {t("destroyedCount", { count: area.destroyed })}
+                      </span>
+                    ) : null}
+                    {area.damaged ? (
+                      <span className="damage-count damage-count--damaged">
+                        {t("damagedCount", { count: area.damaged })}
+                      </span>
+                    ) : null}
+                    {area.possiblyDamaged ? (
+                      <span className="damage-count damage-count--possible">
+                        {t("possibleCount", { count: area.possiblyDamaged })}
+                      </span>
+                    ) : null}
+                    {area.roadBlocks ? (
+                      <span>{t("blockedRoadsCount", { count: area.roadBlocks })}</span>
+                    ) : null}
+                    {area.openReports ? (
+                      <span>
+                        {area.openReports === 1
+                          ? t("oneReport")
+                          : t("reportsLabel", { count: area.openReports })}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="local-area-row__context">
+                    {area.affectedPeople ? (
+                      <span>
+                        {t("people", {
+                          count: formatNumber(area.affectedPeople, language)
+                        })}
+                      </span>
+                    ) : null}
+                    {area.modeledMmi != null ? (
+                      <span>{t("modeledMmi", { value: area.modeledMmi })}</span>
+                    ) : null}
+                    {area.observedCdi != null ? (
+                      <span>{t("observedCdi", { value: area.observedCdi })}</span>
+                    ) : null}
+                  </span>
+                </span>
+                <MapPin size={17} aria-hidden="true" />
+              </button>
+            ))
+          ) : (
+            <div className="empty-state">
+              <MapPinned size={28} aria-hidden="true" />
+              <strong>{t("noLocalEvidenceTitle")}</strong>
+              <p>{t("noLocalEvidenceBody")}</p>
+              <button type="button" className="text-button" onClick={onNeedHelp}>
+                {t("needHelp")}
+              </button>
+            </div>
+          )}
         </div>
       ) : null}
 

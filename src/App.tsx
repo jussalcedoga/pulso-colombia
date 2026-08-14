@@ -1,9 +1,8 @@
 import { CloudOff, RefreshCw, Wifi } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
-import { CITIES } from "./data";
 import { createTranslator, detectLanguage } from "./i18n";
-import { rankCities } from "./scoring";
+import { rankLocalAreas } from "./scoring";
 import type {
   CityId,
   HazardResponse,
@@ -15,7 +14,7 @@ import type {
   User
 } from "./types";
 import { Header } from "./components/Header";
-import { MapView } from "./components/MapView";
+import { MapView, type MapLayers } from "./components/MapView";
 import { SidePanel } from "./components/SidePanel";
 
 const AuthModal = lazy(() =>
@@ -50,7 +49,7 @@ export default function App() {
   const [hazards, setHazards] = useState<HazardResponse | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
-  const [selectedCity, setSelectedCity] = useState<CityId | "all">("all");
+  const [selectedCity, setSelectedCity] = useState<CityId>("manizales");
   const [selectedNeed, setSelectedNeed] = useState<NeedType | "all">("all");
   const [selectedPostType, setSelectedPostType] = useState<PostType | "all">("all");
   const [tab, setTab] = useState<PanelTab>("needs");
@@ -59,13 +58,15 @@ export default function App() {
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [pendingPostAfterAuth, setPendingPostAfterAuth] = useState<PostType | null>(null);
   const [draftPostType, setDraftPostType] = useState<PostType>("need");
-  const [pendingLocation, setPendingLocation] = useState<[number, number] | null>(null);
-  const [pickingLocation, setPickingLocation] = useState(false);
-  const [layers, setLayers] = useState({
-    satellite: true,
-    shaking: true,
+  const [focusedLocation, setFocusedLocation] = useState<[number, number] | null>(null);
+  const [layers, setLayers] = useState<MapLayers>({
+    base: "imagery",
+    nasa: false,
+    modeled: false,
+    observed: true,
+    officialDamage: true,
     reports: true,
-    aftershocks: true
+    aftershocks: false
   });
   const [satelliteDate, setSatelliteDate] = useState("");
   const [loading, setLoading] = useState(true);
@@ -152,16 +153,18 @@ export default function App() {
   }, [toast]);
 
   const visibleReports = useMemo(
-    () => (selectedCity === "all" ? reports : reports.filter((report) => report.city === selectedCity)),
+    () => reports.filter((report) => report.city === selectedCity),
     [reports, selectedCity]
   );
   const selectedReport = reports.find((report) => report.id === selectedReportId) ?? null;
-  const cityPriorities = useMemo(() => rankCities(hazards, reports), [hazards, reports]);
+  const localAreas = useMemo(
+    () => rankLocalAreas(selectedCity, hazards, reports),
+    [hazards, reports, selectedCity]
+  );
   const inboxCount = offers.filter(
     (offer) => offer.direction === "received" && offer.status === "pending"
   ).length;
-  const defaultCity: CityId =
-    selectedCity === "all" ? user?.city ?? "manizales" : selectedCity;
+  const defaultCity: CityId = selectedCity ?? user?.city ?? "manizales";
 
   const changeLanguage = (next: Language) => {
     localStorage.setItem("pulso-language", next);
@@ -170,7 +173,6 @@ export default function App() {
   };
 
   const openPost = (postType: PostType) => {
-    setPendingLocation(null);
     setDraftPostType(postType);
     if (!user) {
       setPendingPostAfterAuth(postType);
@@ -213,27 +215,16 @@ export default function App() {
     }
   };
 
-  const chooseLocation = (postType: PostType) => {
-    setDraftPostType(postType);
-    setActiveModal(null);
-    setPickingLocation(true);
-  };
-
-  const locationPicked = (location: [number, number]) => {
-    setPendingLocation(location);
-    setPickingLocation(false);
-    setActiveModal("need");
-  };
-
   const refreshAfterChange = async (message: string, closeReport = true) => {
     setToast(message);
     if (closeReport) setSelectedReportId(null);
     await Promise.all([loadPublicData(), user ? loadInbox() : Promise.resolve()]);
   };
 
-  const focusCity = (city: CityId) => {
+  const changeCity = (city: CityId) => {
     setSelectedCity(city);
-    setTab("needs");
+    setSelectedReportId(null);
+    setFocusedLocation(null);
   };
 
   return (
@@ -276,8 +267,8 @@ export default function App() {
           tab={tab}
           reports={visibleReports}
           hazards={hazards}
-          cityPriorities={cityPriorities}
-          onCityChange={setSelectedCity}
+          localAreas={localAreas}
+          onCityChange={changeCity}
           onNeedChange={setSelectedNeed}
           onPostTypeChange={setSelectedPostType}
           onTabChange={setTab}
@@ -285,24 +276,29 @@ export default function App() {
           onOfferHelp={() => setActiveModal("donate")}
           onPostUpdate={() => openPost("update")}
           onReportSelect={(report) => setSelectedReportId(report.id)}
-          onCityFocus={focusCity}
+          onAreaFocus={(latitude, longitude) => {
+            setSelectedReportId(null);
+            setFocusedLocation([latitude, longitude]);
+          }}
           onSources={() => setActiveModal("sources")}
         />
         <MapView
           t={t}
+          language={language}
           selectedCity={selectedCity}
           reports={visibleReports}
           hazards={hazards}
           selectedReportId={selectedReportId}
+          focusedLocation={focusedLocation}
           layers={layers}
           satelliteDate={satelliteDate}
-          pickingLocation={pickingLocation}
-          pendingLocation={pendingLocation}
+          onCityChange={changeCity}
           onLayersChange={setLayers}
           onSatelliteDateChange={setSatelliteDate}
           onReportSelect={(report) => setSelectedReportId(report.id)}
-          onLocationPick={locationPicked}
           onLocationError={() => setToast(t("locationError"))}
+          onNeedHelp={openNeed}
+          onOfferHelp={() => setActiveModal("donate")}
         />
       </main>
 
@@ -342,12 +338,9 @@ export default function App() {
             initialCity={defaultCity}
             initialPostType={draftPostType}
             turnstileSiteKey={turnstileSiteKey}
-            location={pendingLocation}
             onClose={() => setActiveModal(null)}
-            onChooseLocation={chooseLocation}
             onPublished={(postType) => {
               setActiveModal(null);
-              setPendingLocation(null);
               void refreshAfterChange(
                 postType === "need"
                   ? t("reportPublished")

@@ -117,6 +117,66 @@ export interface MmiGrid {
   values: number[];
 }
 
+export interface MmiEvidenceCell {
+  id: string;
+  city: CityId;
+  bounds: [number, number, number, number];
+  mmi: number;
+}
+
+export interface DyfiEvidenceCell {
+  id: string;
+  city: CityId;
+  bounds: [number, number, number, number];
+  cdi: number;
+  responses: number;
+  standardDeviation: number | null;
+}
+
+export type DamageClassification =
+  | "destroyed"
+  | "damaged"
+  | "possibly_damaged";
+
+export interface OfficialDamagePoint {
+  id: string;
+  city: CityId;
+  latitude: number;
+  longitude: number;
+  classification: DamageClassification;
+  method: string;
+}
+
+export interface OfficialRoadBlock {
+  id: string;
+  city: CityId;
+  latitude: number;
+  longitude: number;
+}
+
+export interface OfficialDamageArea {
+  id: string;
+  city: CityId;
+  name: string;
+  deliveredAt: string;
+  acquisitionAt: string | null;
+  sensor: string | null;
+  boundary: [number, number][];
+  affectedBuildings: number | null;
+  totalBuildings: number | null;
+  damagePoints: OfficialDamagePoint[];
+  roadBlocks: OfficialRoadBlock[];
+}
+
+export interface GeocodeResult {
+  id: string;
+  label: string;
+  context: string;
+  neighborhood: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface HazardResponse {
   source: {
     name: string;
@@ -131,28 +191,42 @@ export interface HazardResponse {
     updatedAt: number | null;
     reviewStatus: string | null;
     maxMmi: number | null;
+    resolutionKm: number | null;
     bounds: {
       minLatitude: number;
       minLongitude: number;
       maxLatitude: number;
       maxLongitude: number;
     } | null;
-    intensityOverlayUrl: string | null;
-    contours: GeoJSON.FeatureCollection | null;
-    grid: MmiGrid | null;
+    modeledCells: MmiEvidenceCell[];
   };
   groundFailure: {
     landslideAlert: string | null;
     liquefactionAlert: string | null;
     updatedAt: number;
   } | null;
-  communityIntensityUrl: string | null;
+  dyfi: {
+    available: boolean;
+    updatedAt: number | null;
+    sourceUrl: string | null;
+    resolutionKm: number;
+    cells: DyfiEvidenceCell[];
+  };
+  copernicus: {
+    activationCode: string;
+    activationUrl: string;
+    active: boolean;
+    updatedAt: number | null;
+    areas: OfficialDamageArea[];
+  };
   cities: {
     id: CityId;
     name: string;
     latitude: number;
     longitude: number;
     mmi: number | null;
+    observedCdi: number | null;
+    dyfiResponses: number;
   }[];
   satellite: {
     provider: string;

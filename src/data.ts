@@ -6,21 +6,64 @@ export interface CityDefinition {
   nameEn: string;
   center: [number, number];
   zoom: number;
+  bounds: [[number, number], [number, number]];
 }
 
 export const CITIES: CityDefinition[] = [
-  { id: "manizales", name: "Manizales", nameEn: "Manizales", center: [5.0689, -75.5174], zoom: 12 },
-  { id: "pereira", name: "Pereira", nameEn: "Pereira", center: [4.8087, -75.6906], zoom: 12 },
-  { id: "armenia", name: "Armenia", nameEn: "Armenia", center: [4.5339, -75.6811], zoom: 12 },
-  { id: "cali", name: "Cali", nameEn: "Cali", center: [3.4516, -76.532], zoom: 11 },
+  {
+    id: "manizales",
+    name: "Manizales",
+    nameEn: "Manizales",
+    center: [5.0689, -75.5174],
+    zoom: 14,
+    bounds: [[4.99, -75.61], [5.16, -75.4]]
+  },
+  {
+    id: "pereira",
+    name: "Pereira",
+    nameEn: "Pereira",
+    center: [4.8087, -75.6906],
+    zoom: 14,
+    bounds: [[4.71, -75.82], [4.91, -75.59]]
+  },
+  {
+    id: "armenia",
+    name: "Armenia",
+    nameEn: "Armenia",
+    center: [4.5339, -75.6811],
+    zoom: 14,
+    bounds: [[4.44, -75.79], [4.64, -75.58]]
+  },
+  {
+    id: "cali",
+    name: "Cali",
+    nameEn: "Cali",
+    center: [3.4516, -76.532],
+    zoom: 13,
+    bounds: [[3.28, -76.67], [3.61, -76.39]]
+  },
   {
     id: "choco",
     name: "Chocó / Quibdó",
     nameEn: "Chocó / Quibdó",
     center: [5.6947, -76.6611],
-    zoom: 11
+    zoom: 14,
+    bounds: [[5.59, -76.78], [5.81, -76.54]]
   }
 ];
+
+export function cityDefinition(city: CityId): CityDefinition {
+  return CITIES.find((item) => item.id === city) ?? CITIES[0];
+}
+
+export function isPointInCityBounds(
+  city: CityId,
+  latitude: number,
+  longitude: number
+): boolean {
+  const [[south, west], [north, east]] = cityDefinition(city).bounds;
+  return latitude >= south && latitude <= north && longitude >= west && longitude <= east;
+}
 
 export const NEED_TYPES: NeedType[] = [
   "water",

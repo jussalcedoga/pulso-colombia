@@ -12,6 +12,7 @@ import {
   requireUser
 } from "./auth";
 import { getHazards } from "./hazards";
+import { geocode } from "./geocode";
 import {
   apiError,
   applySecurityHeaders,
@@ -259,7 +260,7 @@ async function createReport(env: Env, request: Request): Promise<Response> {
     postType === "update" ? 420 : 700
   );
   rejectPublicContactInfo(`${neighborhood} ${details}`);
-  const location = approximateLocation(body.latitude, body.longitude);
+  const location = approximateLocation(body.latitude, body.longitude, city);
 
   const reportCounts = await env.DB.prepare(
     `SELECT
@@ -677,6 +678,7 @@ async function handleApi(env: Env, request: Request): Promise<Response> {
     );
   }
   if (method === "GET" && pathname === "/api/hazards") return getHazards(env);
+  if (method === "POST" && pathname === "/api/geocode") return geocode(env, request);
   if (method === "GET" && pathname === "/api/me") {
     return json(userPayload(await getSessionUser(env, request)), {
       headers: { "cache-control": "no-store" }

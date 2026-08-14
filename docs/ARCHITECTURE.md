@@ -8,7 +8,8 @@ Pulso deploys as one Cloudflare Worker:
 - Worker routes under `/api/*` provide application and upstream-data APIs.
 - D1 stores users, sessions, approximate reports, confirmations, flags, and
   private aid offers and chat messages.
-- USGS and NASA remain upstream systems of record.
+- Copernicus EMS, USGS, NASA, Esri, and OpenStreetMap remain upstream data
+  providers; Pulso caches and presents their attributed public products.
 
 No payment processor, email service, proprietary map token, or always-on server
 is required for the MVP.
@@ -19,16 +20,22 @@ is required for the MVP.
 
 1. Loads the configured USGS event detail.
 2. Discovers its preferred ShakeMap, DYFI, and ground-failure products.
-3. Loads the low-resolution MMI CoverageJSON and contour GeoJSON.
-4. Samples MMI at each target city and fetches nearby aftershocks.
-5. Caches the result for five minutes.
-6. Falls back to the last embedded official snapshot if the feed is down.
+3. Loads the highest available ShakeMap MMI CoverageJSON and the 1 km DYFI
+   GeoJSON, retaining only cells that intersect a target city.
+4. Loads the Copernicus EMSR916 activation metadata and final grading layers,
+   retaining classified building points and interrupted-road points for target
+   cities.
+5. Samples city MMI, summarizes observed responses, and fetches aftershocks.
+6. Caches the compact response for five minutes.
+7. Falls back to the last embedded USGS snapshot if the live USGS feed is down;
+   unavailable Copernicus coverage remains explicitly empty/pending.
 
 The browser renders:
 
-- OpenStreetMap streets.
-- Dated NASA GIBS VIIRS tiles.
-- USGS georeferenced intensity image and MMI contours.
+- Labeled Esri reference imagery or OpenStreetMap streets.
+- Optional dated NASA GIBS VIIRS tiles.
+- Copernicus analyzed-area boundaries, building findings, and road blocks.
+- Separate USGS modeled-MMI and observed-DYFI cells.
 - Aftershock markers.
 - H3 community-report cells and approximate report markers.
 
@@ -83,17 +90,23 @@ Community cell score:
 = bounded 0..100
 ```
 
-City ranking assigns up to 72 points to the physical-impact proxy. Its remaining
-28 points use a saturating community burden based on urgency, logarithmic people
-count, and confirmations. Logarithmic and saturating terms prevent one unusually
-large report or repeated confirmations from dominating the map.
+Local H3 sectors are ordered with a bounded triage index:
 
-The model ranks response priority and likely impact. It does not estimate
-building loss, casualties, or observed damage.
+```text
+damageBurden = 5 * destroyed + 3 * damaged + possiblyDamaged
+needBurden = 6 * criticalNeeds + 2 * openNeeds + log(1 + affectedPeople)
 
-The model is deterministic and intentionally bounded. It does not infer damage
-from post volume, available-help posts, update posts, account type, or
-self-declared organization status.
+60 * (1 - exp(-damageBurden / 12))
++ 30 * (1 - exp(-needBurden / 12))
++ 10 * physicalImpact / 100
+= bounded 0..100 ordering signal
+```
+
+The numeric value orders sectors internally; the UI shows evidence components
+and coarse critical/high/active bands rather than labeling it as a damage
+percentage. The model is deterministic and intentionally bounded. It does not
+infer observed damage from post volume, available-help posts, update posts,
+account type, or self-declared organization status.
 
 ## Authentication
 
@@ -107,8 +120,9 @@ representative status is an operator-controlled field.
 
 ## Privacy Boundary
 
-The report API accepts a location only long enough to derive an H3 resolution 8
-cell. It stores the cell and cell center, not the submitted coordinate. Public
+The report API accepts a location only long enough to derive an H3 resolution 9
+cell, roughly 350 m across. It stores the cell and cell center, not the submitted
+coordinate. Public
 details reject likely phone numbers and email addresses. Private offer messages
 can contain voluntary coordination details.
 
@@ -116,7 +130,9 @@ can contain voluntary coordination details.
 
 - No authority moderation dashboard; moderation uses D1 CLI and flag thresholds.
 - Chat uses polling rather than WebSockets and has no attachment support.
-- No automatic satellite change detection or building-level damage inference.
+- No Pulso-authored automatic satellite change detection or damage inference;
+  building findings are official Copernicus classifications with their original
+  coverage limitations.
 - No payment processing or individual fundraising verification.
 - Sponsor, volunteer, and organization categories are self-declared unless an
   operator separately verifies the account.

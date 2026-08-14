@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   CityId,
+  GeocodeResult,
   HazardResponse,
   NeedType,
   Offer,
@@ -51,6 +52,11 @@ export const api = {
   health: () => request<{ ok: boolean; time: string }>("/api/health"),
   config: () => request<PublicConfig>("/api/config"),
   hazards: () => request<HazardResponse>("/api/hazards"),
+  geocode: (query: string, city: CityId) =>
+    request<{ results: GeocodeResult[] }>("/api/geocode", {
+      method: "POST",
+      body: JSON.stringify({ query, city })
+    }),
   me: () => request<{ user: User | null }>("/api/me"),
   reports: (city?: CityId | "all") =>
     request<{ reports: Report[] }>(

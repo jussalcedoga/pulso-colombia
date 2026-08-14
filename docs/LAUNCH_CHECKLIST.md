@@ -53,5 +53,6 @@ Complete this before sharing beyond a small community pilot.
 - Authority moderation and representative-verification dashboard.
 - Push notifications and explicit chat retention controls.
 - Audited fundraising integrations and verified recipient accounts.
-- Copernicus EMS or commercial high-resolution imagery when legally available.
+- Additional Copernicus EMS areas or licensed high-resolution imagery when
+  legally available; never present missing coverage as absence of damage.
 - Human-reviewed change detection with confidence and provenance.

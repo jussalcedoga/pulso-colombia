@@ -2,15 +2,26 @@ import {
   CircleAlert,
   Crosshair,
   HeartHandshake,
+  LoaderCircle,
+  LocateFixed,
   MapPin,
   MessageSquarePlus,
+  Search,
   ShieldAlert
 } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { api, ApiRequestError } from "../api";
-import { CITIES, NEED_TYPES } from "../data";
+import { CITIES, isPointInCityBounds, NEED_TYPES } from "../data";
 import type { TFunction } from "../i18n";
-import type { CityId, Language, NeedType, PostType, User } from "../types";
+import type {
+  CityId,
+  GeocodeResult,
+  Language,
+  NeedType,
+  PostType,
+  User
+} from "../types";
+import { LocationPickerMap } from "./LocationPickerMap";
 import { Modal } from "./Modal";
 import { NeedIcon } from "./NeedIcon";
 import { TurnstileWidget } from "./TurnstileWidget";
@@ -22,9 +33,7 @@ interface NeedModalProps {
   initialCity: CityId;
   initialPostType: PostType;
   turnstileSiteKey: string | null;
-  location: [number, number] | null;
   onClose: () => void;
-  onChooseLocation: (postType: PostType) => void;
   onPublished: (postType: PostType) => void;
 }
 
@@ -50,9 +59,7 @@ export function NeedModal({
   initialCity,
   initialPostType,
   turnstileSiteKey,
-  location,
   onClose,
-  onChooseLocation,
   onPublished
 }: NeedModalProps) {
   const [postType, setPostType] = useState<PostType>(initialPostType);
@@ -62,20 +69,16 @@ export function NeedModal({
   const [urgency, setUrgency] = useState(3);
   const [peopleCount, setPeopleCount] = useState(1);
   const [details, setDetails] = useState("");
+  const [location, setLocation] = useState<[number, number] | null>(null);
+  const [locationLabel, setLocationLabel] = useState("");
+  const [addressQuery, setAddressQuery] = useState("");
+  const [addressResults, setAddressResults] = useState<GeocodeResult[]>([]);
+  const [searchingAddress, setSearchingAddress] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileReset, setTurnstileReset] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const canSubmit = useMemo(
-    () =>
-      Boolean(
-        location &&
-          needTypes.length &&
-          details.trim().length >= 10 &&
-          (!turnstileSiteKey || turnstileToken)
-      ),
-    [details, location, needTypes.length, turnstileSiteKey, turnstileToken]
-  );
 
   const toggleNeed = (type: NeedType) => {
     setNeedTypes((current) =>
@@ -87,10 +90,101 @@ export function NeedModal({
     );
   };
 
+  const changeCity = (nextCity: CityId) => {
+    setCity(nextCity);
+    setLocation(null);
+    setLocationLabel("");
+    setAddressResults([]);
+    setError("");
+  };
+
+  const chooseLocation = (
+    nextLocation: [number, number],
+    label = t("mapPointSelected")
+  ) => {
+    setLocation(nextLocation);
+    setLocationLabel(label);
+    setAddressResults([]);
+    setError("");
+  };
+
+  const searchAddress = async () => {
+    const query = addressQuery.trim();
+    if (query.length < 3) {
+      setError(t("addressSearchMinimum"));
+      return;
+    }
+    setSearchingAddress(true);
+    setError("");
+    try {
+      const result = await api.geocode(query, city);
+      setAddressResults(result.results);
+      if (!result.results.length) setError(t("addressNoResults"));
+    } catch (caught) {
+      setError(caught instanceof ApiRequestError ? caught.message : t("genericError"));
+    } finally {
+      setSearchingAddress(false);
+    }
+  };
+
+  const handleSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    void searchAddress();
+  };
+
+  const selectAddress = (result: GeocodeResult) => {
+    chooseLocation(
+      [result.latitude, result.longitude],
+      `${result.label}${result.context ? `, ${result.context}` : ""}`
+    );
+    if (!neighborhood && result.neighborhood) setNeighborhood(result.neighborhood);
+  };
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setError(t("locationError"));
+      return;
+    }
+    setLocating(true);
+    setError("");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const next: [number, number] = [
+          position.coords.latitude,
+          position.coords.longitude
+        ];
+        setLocating(false);
+        if (!isPointInCityBounds(city, next[0], next[1])) {
+          setError(t("locationOutsideCity"));
+          return;
+        }
+        chooseLocation(next, t("deviceLocationSelected"));
+      },
+      () => {
+        setLocating(false);
+        setError(t("locationError"));
+      },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 120_000 }
+    );
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!location) {
       setError(t("locationPending"));
+      return;
+    }
+    if (!needTypes.length) {
+      setError(t("categoryPending"));
+      return;
+    }
+    if (details.trim().length < 10) {
+      setError(t("detailsPending"));
+      return;
+    }
+    if (turnstileSiteKey && !turnstileToken) {
+      setError(t("securityPending"));
       return;
     }
     setSubmitting(true);
@@ -166,7 +260,10 @@ export function NeedModal({
       <form className="form-grid" onSubmit={submit}>
         <label className="field">
           <span>{t("yourCity")}</span>
-          <select value={city} onChange={(event) => setCity(event.target.value as CityId)}>
+          <select
+            value={city}
+            onChange={(event) => changeCity(event.target.value as CityId)}
+          >
             {CITIES.map((item) => (
               <option key={item.id} value={item.id}>
                 {language === "es" ? item.name : item.nameEn}
@@ -185,31 +282,99 @@ export function NeedModal({
           />
         </label>
 
-        <div className="field field--wide">
-          <span>{t("approximateLocation")}</span>
-          {location ? (
+        <div className="field field--wide location-field">
+          <span>{t("findLocation")}</span>
+          <div className="address-search">
+            <Search size={18} aria-hidden="true" />
+            <input
+              type="text"
+              value={addressQuery}
+              maxLength={120}
+              placeholder={t("addressPlaceholder")}
+              autoComplete="street-address"
+              onChange={(event) => setAddressQuery(event.target.value)}
+              onKeyDown={handleSearchKey}
+            />
             <button
-              className="location-selected"
               type="button"
-              onClick={() => onChooseLocation(postType)}
+              onClick={() => void searchAddress()}
+              disabled={searchingAddress}
+              aria-label={t("searchAddress")}
+              title={t("searchAddress")}
             >
-              <MapPin size={19} aria-hidden="true" />
-              <span>
-                <strong>{t("selectedLocation")}</strong>
-                <small>{t("approximateLocation")}</small>
-              </span>
-              <Crosshair size={18} aria-hidden="true" />
+              {searchingAddress ? (
+                <LoaderCircle className="spin-icon" size={18} aria-hidden="true" />
+              ) : (
+                <Search size={18} aria-hidden="true" />
+              )}
             </button>
-          ) : (
+          </div>
+          {addressResults.length ? (
+            <div className="address-results" role="listbox" aria-label={t("addressResults")}>
+              {addressResults.map((result) => (
+                <button
+                  key={result.id}
+                  type="button"
+                  role="option"
+                  aria-selected={false}
+                  onClick={() => selectAddress(result)}
+                >
+                  <MapPin size={17} aria-hidden="true" />
+                  <span>
+                    <strong>{result.label}</strong>
+                    <small>{result.context}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="location-tools">
             <button
-              className="location-picker"
+              className="button button--secondary"
               type="button"
-              onClick={() => onChooseLocation(postType)}
+              onClick={useCurrentLocation}
+              disabled={locating}
             >
-              <Crosshair size={19} aria-hidden="true" />
-              {t("chooseLocation")}
+              {locating ? (
+                <LoaderCircle className="spin-icon" size={17} aria-hidden="true" />
+              ) : (
+                <LocateFixed size={17} aria-hidden="true" />
+              )}
+              {locating ? t("locating") : t("locateMe")}
             </button>
-          )}
+            <span>
+              <Crosshair size={15} aria-hidden="true" />
+              {t("mapClickFallback")}
+            </span>
+          </div>
+          <LocationPickerMap
+            city={city}
+            location={location}
+            label={t("locationMap")}
+            onChange={(nextLocation) => chooseLocation(nextLocation)}
+            onInvalid={() => setError(t("locationOutsideCity"))}
+          />
+          <div className={`location-status${location ? " is-selected" : ""}`}>
+            <MapPin size={17} aria-hidden="true" />
+            <span>
+              <strong>{location ? t("selectedLocation") : t("locationPending")}</strong>
+              <small>
+                {location
+                  ? `${locationLabel} · ${t("publicCellPreview")}`
+                  : t("locationSelectionHint")}
+              </small>
+            </span>
+          </div>
+          <small className="geocoder-credit">
+            {t("addressSearchCredit")}{" "}
+            <a
+              href="https://www.openstreetmap.org/copyright"
+              target="_blank"
+              rel="noreferrer"
+            >
+              OpenStreetMap
+            </a>
+          </small>
         </div>
 
         <fieldset className="field field--wide">
@@ -339,7 +504,7 @@ export function NeedModal({
                   : "button--primary"
             }`}
             type="submit"
-            disabled={!canSubmit || submitting}
+            disabled={submitting}
           >
             {submitting
               ? t("publishing")

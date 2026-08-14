@@ -1,4 +1,10 @@
-import { ArrowUpRight, Satellite, ShieldCheck, UsersRound } from "lucide-react";
+import {
+  ArrowUpRight,
+  Building2,
+  Satellite,
+  ShieldCheck,
+  UsersRound
+} from "lucide-react";
 import { formatDateTime } from "../format";
 import type { TFunction } from "../i18n";
 import type { HazardResponse, Language } from "../types";
@@ -27,6 +33,21 @@ export function SourcesModal({ t, language, hazards, onClose }: SourcesModalProp
           </div>
         </div>
         <div className="source-entry">
+          <Building2 size={20} aria-hidden="true" />
+          <div>
+            <strong>Copernicus EMS · EMSR916</strong>
+            <p>{t("copernicusSource")}</p>
+            {hazards?.copernicus.updatedAt ? (
+              <span>
+                {t("updated")}:{" "}
+                {formatDateTime(hazards.copernicus.updatedAt, language)}
+              </span>
+            ) : (
+              <span>{t("officialMappingPending")}</span>
+            )}
+          </div>
+        </div>
+        <div className="source-entry">
           <Satellite size={20} aria-hidden="true" />
           <div>
             <strong>NASA EOSDIS GIBS / VIIRS</strong>
@@ -51,10 +72,26 @@ export function SourcesModal({ t, language, hazards, onClose }: SourcesModalProp
         <p>{t("limitationsBody")}</p>
       </section>
       {hazards ? (
-        <a className="button button--secondary button--full" href={hazards.event.url} target="_blank" rel="noreferrer">
-          {t("openOfficialSource")}
-          <ArrowUpRight size={18} aria-hidden="true" />
-        </a>
+        <div className="source-links">
+          <a
+            className="button button--secondary"
+            href={hazards.copernicus.activationUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Copernicus EMSR916
+            <ArrowUpRight size={18} aria-hidden="true" />
+          </a>
+          <a
+            className="button button--secondary"
+            href={hazards.event.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            USGS
+            <ArrowUpRight size={18} aria-hidden="true" />
+          </a>
+        </div>
       ) : null}
     </Modal>
   );
