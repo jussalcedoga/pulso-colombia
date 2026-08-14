@@ -59,8 +59,8 @@ posts, and separate **Necesito ayuda / I need help** and
   offers, accept/decline them, and chat after an offer is accepted.
 - Gives every need, available-help post, and community update a lightweight
   public discussion. Only the single operator-assigned moderator can close or
-  reopen posts, or permanently delete test/unsafe posts; resolved posts leave
-  the public feed.
+  reopen posts. Authors can edit or delete their own posts, and the moderator
+  can permanently delete any post; resolved posts leave the public feed.
 - Links only to configured official organization domains. Pulso does not process
   money or charge fees.
 - Runs as a Cloudflare Worker with static assets and D1 on the free tier.
@@ -177,8 +177,9 @@ performed the check outside Pulso.
 ## Owner Moderation
 
 Exactly one account may hold the `moderator` role. This operator can close any
-community post; authors and other users cannot close posts. Assign the role only
-after verifying control of the intended Pulso account:
+community post; authors and other users cannot change closure state. Authors
+can edit or delete their own content, while the moderator can delete any post.
+Assign the role only after verifying control of the intended Pulso account:
 
 ```bash
 npx wrangler d1 execute pulso-colombia --remote \

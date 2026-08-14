@@ -58,6 +58,7 @@ export default function App() {
   const [tab, setTab] = useState<PanelTab>("needs");
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [editingReportId, setEditingReportId] = useState<string | null>(null);
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [pendingPostAfterAuth, setPendingPostAfterAuth] = useState<PostType | null>(null);
   const [draftPostType, setDraftPostType] = useState<PostType>("need");
@@ -157,6 +158,7 @@ export default function App() {
     [reports, selectedCity]
   );
   const selectedReport = reports.find((report) => report.id === selectedReportId) ?? null;
+  const editingReport = reports.find((report) => report.id === editingReportId) ?? null;
   const localAreas = useMemo(
     () => rankLocalAreas(selectedCity, null, reports),
     [reports, selectedCity]
@@ -173,6 +175,7 @@ export default function App() {
   };
 
   const openPost = (postType: PostType) => {
+    setEditingReportId(null);
     setDraftPostType(postType);
     if (!user) {
       setPendingPostAfterAuth(postType);
@@ -215,6 +218,7 @@ export default function App() {
       setUser(null);
       setOffers([]);
       setSelectedReportId(null);
+      setEditingReportId(null);
       setToast(t("signOut"));
     }
   };
@@ -336,14 +340,22 @@ export default function App() {
             t={t}
             language={language}
             user={user}
-            initialCity={defaultCity}
-            initialPostType={draftPostType}
+            initialCity={editingReport?.city ?? defaultCity}
+            initialPostType={editingReport?.postType ?? draftPostType}
+            editingReport={editingReport}
             turnstileSiteKey={turnstileSiteKey}
-            onClose={() => setActiveModal(null)}
+            onClose={() => {
+              setActiveModal(null);
+              setEditingReportId(null);
+            }}
             onPublished={(postType) => {
               setActiveModal(null);
+              const wasEditing = Boolean(editingReport);
+              setEditingReportId(null);
               void refreshAfterChange(
-                postType === "need"
+                wasEditing
+                  ? t("postUpdated")
+                  : postType === "need"
                   ? t("reportPublished")
                   : postType === "offer"
                     ? t("helpPublished")
@@ -406,6 +418,11 @@ export default function App() {
             user={user}
             hazards={null}
             onClose={() => setSelectedReportId(null)}
+            onEdit={() => {
+              setEditingReportId(selectedReport.id);
+              setSelectedReportId(null);
+              setActiveModal("need");
+            }}
             onRequireAuth={() => setActiveModal("auth")}
             onChanged={(message) => void refreshAfterChange(message)}
           />

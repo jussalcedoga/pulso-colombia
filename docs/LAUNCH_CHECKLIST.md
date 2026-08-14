@@ -29,7 +29,8 @@ Complete this before sharing beyond a small community pilot.
 - Confirm API responses carry CSP, frame, referrer, and MIME headers.
 - Test public phone/email rejection.
 - Test flag submission and operator review queries.
-- Confirm residents cannot close or delete posts.
+- Confirm residents cannot close posts or edit/delete another person's post.
+- Confirm authors can edit and permanently delete each of the three post types.
 - Confirm the sole moderator can close and permanently delete a disposable post.
 - Restore one account on two devices with the same recovery code and verify the
   inbox refreshes on open and browser focus.

@@ -21,6 +21,7 @@ import type {
   LocationMode,
   NeedType,
   PostType,
+  Report,
   User
 } from "../types";
 import { LocationPickerMap } from "./LocationPickerMap";
@@ -34,6 +35,7 @@ interface NeedModalProps {
   user: User;
   initialCity: CityId;
   initialPostType: PostType;
+  editingReport?: Report | null;
   turnstileSiteKey: string | null;
   onClose: () => void;
   onPublished: (postType: PostType) => void;
@@ -60,20 +62,39 @@ export function NeedModal({
   user,
   initialCity,
   initialPostType,
+  editingReport = null,
   turnstileSiteKey,
   onClose,
   onPublished
 }: NeedModalProps) {
-  const [postType, setPostType] = useState<PostType>(initialPostType);
-  const [locationMode, setLocationMode] = useState<LocationMode>("local");
-  const [city, setCity] = useState<CityId>(initialCity || user.city);
-  const [neighborhood, setNeighborhood] = useState("");
-  const [needTypes, setNeedTypes] = useState<NeedType[]>([]);
-  const [urgency, setUrgency] = useState(3);
-  const [peopleCount, setPeopleCount] = useState(1);
-  const [details, setDetails] = useState("");
-  const [location, setLocation] = useState<[number, number] | null>(null);
-  const [locationLabel, setLocationLabel] = useState("");
+  const [postType, setPostType] = useState<PostType>(
+    editingReport?.postType ?? initialPostType
+  );
+  const [locationMode, setLocationMode] = useState<LocationMode>(
+    editingReport?.locationMode ?? "local"
+  );
+  const [city, setCity] = useState<CityId>(
+    editingReport?.city ?? initialCity ?? user.city
+  );
+  const [neighborhood, setNeighborhood] = useState(
+    editingReport?.neighborhood ?? ""
+  );
+  const [needTypes, setNeedTypes] = useState<NeedType[]>(
+    editingReport?.needTypes ?? []
+  );
+  const [urgency, setUrgency] = useState(editingReport?.urgency ?? 3);
+  const [peopleCount, setPeopleCount] = useState(
+    editingReport?.peopleCount ?? 1
+  );
+  const [details, setDetails] = useState(editingReport?.details ?? "");
+  const [location, setLocation] = useState<[number, number] | null>(
+    editingReport && editingReport.locationMode === "local"
+      ? [editingReport.latitude, editingReport.longitude]
+      : null
+  );
+  const [locationLabel, setLocationLabel] = useState(
+    editingReport ? t("existingApproximateLocation") : ""
+  );
   const [addressQuery, setAddressQuery] = useState("");
   const [addressResults, setAddressResults] = useState<GeocodeResult[]>([]);
   const [searchingAddress, setSearchingAddress] = useState(false);
@@ -209,7 +230,7 @@ export function NeedModal({
     setSubmitting(true);
     setError("");
     try {
-      await api.createReport({
+      const payload = {
         postType,
         locationMode: isRemoteOffer ? "remote" : "local",
         city,
@@ -221,7 +242,12 @@ export function NeedModal({
         peopleCount: postType === "update" ? 1 : peopleCount,
         details,
         turnstileToken
-      });
+      } as const;
+      if (editingReport) {
+        await api.updateReportContent(editingReport.id, payload);
+      } else {
+        await api.createReport(payload);
+      }
       onPublished(postType);
     } catch (caught) {
       setError(caught instanceof ApiRequestError ? caught.message : t("genericError"));
@@ -234,48 +260,54 @@ export function NeedModal({
   return (
     <Modal
       title={
-        postType === "need"
-          ? t("needFormTitle")
-          : postType === "offer"
-            ? t("offerFormTitle")
-            : t("updateFormTitle")
+        editingReport
+          ? t("editPostTitle")
+          : postType === "need"
+            ? t("needFormTitle")
+            : postType === "offer"
+              ? t("offerFormTitle")
+              : t("updateFormTitle")
       }
       t={t}
       onClose={onClose}
       size="large"
     >
-      <div className="segmented-control post-type-control">
-        <button
-          type="button"
-          className={postType === "need" ? "is-active" : ""}
-          onClick={() => setPostType("need")}
-        >
-          <CircleAlert size={17} aria-hidden="true" />
-          {t("needPost")}
-        </button>
-        <button
-          type="button"
-          className={postType === "offer" ? "is-active" : ""}
-          onClick={() => setPostType("offer")}
-        >
-          <HeartHandshake size={17} aria-hidden="true" />
-          {t("offerPost")}
-        </button>
-        <button
-          type="button"
-          className={postType === "update" ? "is-active" : ""}
-          onClick={() => setPostType("update")}
-        >
-          <MessageSquarePlus size={17} aria-hidden="true" />
-          {t("updatePost")}
-        </button>
-      </div>
+      {!editingReport ? (
+        <div className="segmented-control post-type-control">
+          <button
+            type="button"
+            className={postType === "need" ? "is-active" : ""}
+            onClick={() => setPostType("need")}
+          >
+            <CircleAlert size={17} aria-hidden="true" />
+            {t("needPost")}
+          </button>
+          <button
+            type="button"
+            className={postType === "offer" ? "is-active" : ""}
+            onClick={() => setPostType("offer")}
+          >
+            <HeartHandshake size={17} aria-hidden="true" />
+            {t("offerPost")}
+          </button>
+          <button
+            type="button"
+            className={postType === "update" ? "is-active" : ""}
+            onClick={() => setPostType("update")}
+          >
+            <MessageSquarePlus size={17} aria-hidden="true" />
+            {t("updatePost")}
+          </button>
+        </div>
+      ) : null}
       <p className="modal-intro">
-        {postType === "need"
-          ? t("needFormIntro")
-          : postType === "offer"
-            ? t("offerFormIntro")
-            : t("updateFormIntro")}
+        {editingReport
+          ? t("editPostIntro")
+          : postType === "need"
+            ? t("needFormIntro")
+            : postType === "offer"
+              ? t("offerFormIntro")
+              : t("updateFormIntro")}
       </p>
       <form className="form-grid" onSubmit={submit}>
         {postType === "offer" ? (
@@ -595,12 +627,16 @@ export function NeedModal({
             disabled={submitting}
           >
             {submitting
-              ? t("publishing")
-              : postType === "need"
-                ? t("publishReport")
-                : postType === "offer"
-                  ? t("publishOffer")
-                  : t("publishUpdate")}
+              ? editingReport
+                ? t("savingChanges")
+                : t("publishing")
+              : editingReport
+                ? t("saveChanges")
+                : postType === "need"
+                  ? t("publishReport")
+                  : postType === "offer"
+                    ? t("publishOffer")
+                    : t("publishUpdate")}
           </button>
         </div>
       </form>

@@ -59,6 +59,7 @@ const moderator: User = {
 
 function renderReport(user: User) {
   const onChanged = vi.fn();
+  const onEdit = vi.fn();
   render(
     <ReportModal
       t={createTranslator("en")}
@@ -67,11 +68,12 @@ function renderReport(user: User) {
       user={user}
       hazards={null}
       onClose={vi.fn()}
+      onEdit={onEdit}
       onRequireAuth={vi.fn()}
       onChanged={onChanged}
     />
   );
-  return { onChanged };
+  return { onChanged, onEdit };
 }
 
 describe("moderator report deletion", () => {
@@ -99,5 +101,17 @@ describe("moderator report deletion", () => {
     renderReport({ ...moderator, id: "usr_resident", role: "resident" });
 
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+  });
+
+  it("allows the original author to edit and delete", () => {
+    const { onEdit } = renderReport({
+      ...moderator,
+      id: report.userId,
+      role: "resident"
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(onEdit).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });
 });

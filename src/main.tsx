@@ -19,7 +19,18 @@ createRoot(document.getElementById("root")!).render(
 );
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
+
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js");
+    void navigator.serviceWorker
+      .register("/sw.js", { updateViaCache: "none" })
+      .then((registration) => registration.update());
   });
 }

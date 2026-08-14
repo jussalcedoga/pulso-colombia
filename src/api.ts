@@ -26,6 +26,20 @@ export class ApiRequestError extends Error {
   }
 }
 
+export interface ReportPayload {
+  postType: PostType;
+  locationMode: LocationMode;
+  city: CityId;
+  neighborhood: string;
+  latitude?: number;
+  longitude?: number;
+  needTypes: NeedType[];
+  urgency: number;
+  peopleCount: number;
+  details: string;
+  turnstileToken?: string;
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body) headers.set("content-type", "application/json");
@@ -80,21 +94,14 @@ export const api = {
       body: JSON.stringify({ recoveryCode })
     }),
   logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
-  createReport: (payload: {
-    postType: PostType;
-    locationMode: LocationMode;
-    city: CityId;
-    neighborhood: string;
-    latitude?: number;
-    longitude?: number;
-    needTypes: NeedType[];
-    urgency: number;
-    peopleCount: number;
-    details: string;
-    turnstileToken?: string;
-  }) =>
+  createReport: (payload: ReportPayload) =>
     request<{ id: string }>("/api/reports", {
       method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  updateReportContent: (id: string, payload: ReportPayload) =>
+    request<{ ok: boolean }>(`/api/reports/${encodeURIComponent(id)}`, {
+      method: "PUT",
       body: JSON.stringify(payload)
     }),
   updateReport: (id: string, status: ReportStatus) =>

@@ -14,6 +14,13 @@ Pulso deploys as one Cloudflare Worker:
 No payment processor, email service, proprietary map token, or always-on server
 is required for the MVP.
 
+## Client Updates
+
+The service worker uses network-first navigation and static reads with cached
+offline fallbacks. It never serves a cached application shell while the network
+is available. When a new worker activates, an already-controlled tab reloads
+once so new deployments become visible immediately.
+
 ## Hazard Flow
 
 `GET /api/hazards`:
@@ -59,10 +66,13 @@ The moderator cannot read a conversation unless that account is a participant.
 Every visible post also has a public text discussion. Anyone may read it;
 posting requires an account. Resolved posts and their discussions leave public
 APIs. Only the single operator-assigned `moderator` account may resolve or
-reopen a post, or permanently delete it; post authors cannot change closure
-state. A permanent delete cascades to the post's public comments, confirmations,
-flags, private connections, and chat messages. The moderator header exposes a
-dedicated active-post management view; server authorization remains authoritative.
+reopen a post; post authors cannot change closure state. Authors may edit or
+delete their own posts, and the moderator may delete any post. Edits rerun the
+same location and privacy validation as publication and reset community
+confirmations. A permanent delete cascades to the post's public comments,
+confirmations, flags, private connections, and chat messages. The moderator
+header exposes a dedicated active-post management view; server authorization
+remains authoritative.
 
 Available-help posts explicitly distinguish local and remote support. Local
 help stores and displays an approximate pin. Remote help is associated with a
@@ -146,8 +156,8 @@ addresses. Private offer messages can contain voluntary coordination details.
 
 ## Known MVP Limits
 
-- No authority moderation dashboard; flags remain in D1 for moderator review
-  and never hide a post automatically.
+- The moderation view lists active posts but does not yet provide a dedicated
+  flag-review queue; flags remain in D1 and never hide a post automatically.
 - Chat uses polling rather than WebSockets and has no attachment support.
 - No Pulso-authored automatic satellite change detection or damage inference;
   building findings are official Copernicus classifications with their original

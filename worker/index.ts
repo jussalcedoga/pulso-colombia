@@ -84,6 +84,58 @@ interface ReportCommentBody {
   message?: unknown;
 }
 
+function validatedReport(body: ReportBody) {
+  const postType = enumValue(
+    body.postType ?? "need",
+    ["need", "offer", "update"] as const,
+    "El tipo de publicación"
+  );
+  const locationMode =
+    postType === "offer"
+      ? enumValue(
+          body.locationMode ?? "local",
+          ["local", "remote"] as const,
+          "La modalidad de ayuda"
+        )
+      : "local";
+  const city = enumValue(body.city, CITY_IDS, "La ciudad");
+  const neighborhood =
+    locationMode === "remote" ? "" : optionalString(body.neighborhood, 60);
+  const needTypes = enumArray(body.needTypes, NEED_TYPES, "Las necesidades", NEED_TYPES.length);
+  const submittedUrgency = integerValue(body.urgency, "La urgencia", 1, 5);
+  const submittedPeopleCount = integerValue(
+    body.peopleCount,
+    "El número de personas",
+    1,
+    10_000
+  );
+  const urgency = postType === "need" ? submittedUrgency : 1;
+  const peopleCount = postType === "update" ? 1 : submittedPeopleCount;
+  const details = requiredString(
+    body.details,
+    "La descripción",
+    10,
+    postType === "update" ? 420 : 700
+  );
+  rejectPublicContactInfo(`${neighborhood} ${details}`);
+  const location =
+    locationMode === "remote"
+      ? targetCityAnchor(city)
+      : approximateLocation(body.latitude, body.longitude, city);
+
+  return {
+    postType,
+    locationMode,
+    city,
+    neighborhood,
+    needTypes,
+    urgency,
+    peopleCount,
+    details,
+    location
+  };
+}
+
 function userPayload(user: Awaited<ReturnType<typeof getSessionUser>>) {
   return user ? { user } : { user: null };
 }
@@ -258,43 +310,7 @@ async function createReport(env: Env, request: Request): Promise<Response> {
   const body = await readJson<ReportBody>(request);
   await verifyTurnstile(env, request, body.turnstileToken, "report");
   await enforceRateLimit(env, request, `report:${user.id}`, 8, 60 * 60);
-  const postType = enumValue(
-    body.postType ?? "need",
-    ["need", "offer", "update"] as const,
-    "El tipo de publicación"
-  );
-  const locationMode =
-    postType === "offer"
-      ? enumValue(
-          body.locationMode ?? "local",
-          ["local", "remote"] as const,
-          "La modalidad de ayuda"
-        )
-      : "local";
-  const city = enumValue(body.city, CITY_IDS, "La ciudad");
-  const neighborhood =
-    locationMode === "remote" ? "" : optionalString(body.neighborhood, 60);
-  const needTypes = enumArray(body.needTypes, NEED_TYPES, "Las necesidades", NEED_TYPES.length);
-  const submittedUrgency = integerValue(body.urgency, "La urgencia", 1, 5);
-  const submittedPeopleCount = integerValue(
-    body.peopleCount,
-    "El número de personas",
-    1,
-    10_000
-  );
-  const urgency = postType === "need" ? submittedUrgency : 1;
-  const peopleCount = postType === "update" ? 1 : submittedPeopleCount;
-  const details = requiredString(
-    body.details,
-    "La descripción",
-    10,
-    postType === "update" ? 420 : 700
-  );
-  rejectPublicContactInfo(`${neighborhood} ${details}`);
-  const location =
-    locationMode === "remote"
-      ? targetCityAnchor(city)
-      : approximateLocation(body.latitude, body.longitude, city);
+  const report = validatedReport(body);
 
   const reportCounts = await env.DB.prepare(
     `SELECT
@@ -331,17 +347,17 @@ async function createReport(env: Env, request: Request): Promise<Response> {
     .bind(
       reportId,
       user.id,
-      postType,
-      locationMode,
-      city,
-      neighborhood,
-      location.h3Cell,
-      location.latitude,
-      location.longitude,
-      JSON.stringify(needTypes),
-      urgency,
-      peopleCount,
-      details
+      report.postType,
+      report.locationMode,
+      report.city,
+      report.neighborhood,
+      report.location.h3Cell,
+      report.location.latitude,
+      report.location.longitude,
+      JSON.stringify(report.needTypes),
+      report.urgency,
+      report.peopleCount,
+      report.details
     )
     .run();
   await invalidateReportCache();
@@ -368,12 +384,95 @@ async function updateReport(
   return json({ ok: true });
 }
 
+async function updateReportContent(
+  env: Env,
+  request: Request,
+  reportId: string
+): Promise<Response> {
+  const user = await requireUser(env, request);
+  const body = await readJson<ReportBody>(request);
+  await verifyTurnstile(env, request, body.turnstileToken, "report");
+  await enforceRateLimit(env, request, `report-edit:${user.id}`, 20, 60 * 60);
+
+  const existing = await env.DB.prepare(
+    "SELECT user_id, post_type, status FROM reports WHERE id = ?"
+  )
+    .bind(reportId)
+    .first<{ user_id: string; post_type: string; status: string }>();
+  if (!existing) {
+    throw new HttpError(404, "report_not_found", "No se encontró el reporte.");
+  }
+  if (existing.user_id !== user.id) {
+    throw new HttpError(
+      403,
+      "report_author_required",
+      "Solo quien publicó esta entrada puede editarla."
+    );
+  }
+  if (existing.status === "resolved") {
+    throw new HttpError(409, "report_resolved", "Esta publicación ya fue cerrada.");
+  }
+
+  const report = validatedReport(body);
+  if (report.postType !== existing.post_type) {
+    throw new HttpError(
+      409,
+      "post_type_immutable",
+      "El tipo de publicación no se puede cambiar."
+    );
+  }
+
+  await env.DB.batch([
+    env.DB
+      .prepare(
+        `UPDATE reports
+            SET location_mode = ?, city = ?, neighborhood = ?, h3_cell = ?,
+                latitude = ?, longitude = ?, need_types = ?, urgency = ?,
+                people_count = ?, details = ?, confirmations = 0,
+                updated_at = datetime('now')
+          WHERE id = ? AND user_id = ?`
+      )
+      .bind(
+        report.locationMode,
+        report.city,
+        report.neighborhood,
+        report.location.h3Cell,
+        report.location.latitude,
+        report.location.longitude,
+        JSON.stringify(report.needTypes),
+        report.urgency,
+        report.peopleCount,
+        report.details,
+        reportId,
+        user.id
+      ),
+    env.DB
+      .prepare("DELETE FROM report_confirmations WHERE report_id = ?")
+      .bind(reportId)
+  ]);
+  await invalidateReportCache();
+  return json({ ok: true }, { headers: { "cache-control": "no-store" } });
+}
+
 async function deleteReport(
   env: Env,
   request: Request,
   reportId: string
 ): Promise<Response> {
-  await requireModerator(env, request);
+  const user = await requireUser(env, request);
+  const report = await env.DB.prepare("SELECT user_id FROM reports WHERE id = ?")
+    .bind(reportId)
+    .first<{ user_id: string }>();
+  if (!report) {
+    throw new HttpError(404, "report_not_found", "No se encontró el reporte.");
+  }
+  if (user.role !== "moderator" && report.user_id !== user.id) {
+    throw new HttpError(
+      403,
+      "report_owner_required",
+      "Solo quien publicó esta entrada o la persona moderadora puede eliminarla."
+    );
+  }
   const result = await env.DB.prepare("DELETE FROM reports WHERE id = ?")
     .bind(reportId)
     .run();
@@ -866,6 +965,7 @@ async function handleApi(env: Env, request: Request): Promise<Response> {
 
   const reportId = routeId(pathname, "/api/reports/");
   if (method === "PATCH" && reportId) return updateReport(env, request, reportId);
+  if (method === "PUT" && reportId) return updateReportContent(env, request, reportId);
   if (method === "DELETE" && reportId) return deleteReport(env, request, reportId);
   const confirmId = routeId(pathname, "/api/reports/", "/confirm");
   if (method === "POST" && confirmId) return confirmReport(env, request, confirmId);

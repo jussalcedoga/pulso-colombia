@@ -8,6 +8,7 @@ import {
   HeartHandshake,
   MapPin,
   MessageCircle,
+  Pencil,
   ShieldAlert,
   Trash2,
   UsersRound
@@ -38,6 +39,7 @@ interface ReportModalProps {
   user: User | null;
   hazards: HazardResponse | null;
   onClose: () => void;
+  onEdit: () => void;
   onRequireAuth: () => void;
   onChanged: (message: string) => void;
 }
@@ -73,6 +75,7 @@ export function ReportModal({
   user,
   hazards,
   onClose,
+  onEdit,
   onRequireAuth,
   onChanged
 }: ReportModalProps) {
@@ -104,6 +107,7 @@ export function ReportModal({
     ).length ?? 0;
   const isAuthor = user?.id === report.userId;
   const canModerate = user?.role === "moderator";
+  const canDelete = Boolean(isAuthor || canModerate);
 
   useEffect(() => {
     let active = true;
@@ -485,36 +489,48 @@ export function ReportModal({
           {error ? <div className="form-error" role="alert">{error}</div> : null}
           <div className="report-detail__actions">
             {canModerate ? (
-              <>
-                {report.status === "resolved" ? (
-                  <button className="button button--secondary" type="button" disabled={submitting} onClick={() => changeStatus("open")}>
-                    {report.postType === "need" ? t("reopen") : t("reopenPost")}
-                  </button>
-                ) : (
-                  <button className="button button--primary" type="button" disabled={submitting} onClick={() => changeStatus("resolved")}>
-                    <CheckCircle2 size={18} aria-hidden="true" />
-                    {report.postType === "need" ? t("markResolved") : t("closePost")}
-                  </button>
-                )}
-                <button
-                  className="button button--danger"
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => setConfirmingDelete(true)}
-                >
-                  <Trash2 size={17} aria-hidden="true" />
-                  {t("deletePost")}
+              report.status === "resolved" ? (
+                <button className="button button--secondary" type="button" disabled={submitting} onClick={() => changeStatus("open")}>
+                  {report.postType === "need" ? t("reopen") : t("reopenPost")}
                 </button>
-              </>
-            ) : (
+              ) : (
+                <button className="button button--primary" type="button" disabled={submitting} onClick={() => changeStatus("resolved")}>
+                  <CheckCircle2 size={18} aria-hidden="true" />
+                  {report.postType === "need" ? t("markResolved") : t("closePost")}
+                </button>
+              )
+            ) : null}
+            {isAuthor ? (
+              <button
+                className="button button--secondary"
+                type="button"
+                disabled={submitting}
+                onClick={onEdit}
+              >
+                <Pencil size={17} aria-hidden="true" />
+                {t("editPost")}
+              </button>
+            ) : null}
+            {canDelete ? (
+              <button
+                className="button button--danger"
+                type="button"
+                disabled={submitting}
+                onClick={() => setConfirmingDelete(true)}
+              >
+                <Trash2 size={17} aria-hidden="true" />
+                {t("deletePost")}
+              </button>
+            ) : null}
+            {!isAuthor && !canModerate ? (
               <>
-                {report.postType === "need" && !isAuthor ? (
+                {report.postType === "need" ? (
                   <button className="button button--secondary" type="button" disabled={submitting} onClick={confirm}>
                     <CheckCircle2 size={18} aria-hidden="true" />
                     {t("confirm")}
                   </button>
                 ) : null}
-                {report.status !== "resolved" && !isAuthor ? (
+                {report.status !== "resolved" ? (
                   <button
                     className="button button--give"
                     type="button"
@@ -529,9 +545,9 @@ export function ReportModal({
                   </button>
                 ) : null}
               </>
-            )}
+            ) : null}
           </div>
-          {canModerate && confirmingDelete ? (
+          {canDelete && confirmingDelete ? (
             <div className="delete-confirmation" role="alert">
               <div>
                 <strong>{t("deletePostConfirmTitle")}</strong>
