@@ -9,6 +9,7 @@ import {
   MapPin,
   MessageCircle,
   ShieldAlert,
+  Trash2,
   UsersRound
 } from "lucide-react";
 import { latLngToCell } from "h3-js";
@@ -86,6 +87,7 @@ export function ReportModal({
   const [commentMessage, setCommentMessage] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [commentError, setCommentError] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const city = CITIES.find((item) => item.id === report.city);
   const cityName = language === "es" ? city?.name : city?.nameEn;
   const mmi = sampleModeledMmi(
@@ -157,6 +159,19 @@ export function ReportModal({
             ? t("statusResolved")
             : t("statusOpen")
       );
+    } catch (caught) {
+      setError(caught instanceof ApiRequestError ? caught.message : t("genericError"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const deleteReport = async () => {
+    setSubmitting(true);
+    setError("");
+    try {
+      await api.deleteReport(report.id);
+      onChanged(t("postDeleted"));
     } catch (caught) {
       setError(caught instanceof ApiRequestError ? caught.message : t("genericError"));
     } finally {
@@ -470,16 +485,27 @@ export function ReportModal({
           {error ? <div className="form-error" role="alert">{error}</div> : null}
           <div className="report-detail__actions">
             {canModerate ? (
-              report.status === "resolved" ? (
-                <button className="button button--secondary" type="button" disabled={submitting} onClick={() => changeStatus("open")}>
-                  {report.postType === "need" ? t("reopen") : t("reopenPost")}
+              <>
+                {report.status === "resolved" ? (
+                  <button className="button button--secondary" type="button" disabled={submitting} onClick={() => changeStatus("open")}>
+                    {report.postType === "need" ? t("reopen") : t("reopenPost")}
+                  </button>
+                ) : (
+                  <button className="button button--primary" type="button" disabled={submitting} onClick={() => changeStatus("resolved")}>
+                    <CheckCircle2 size={18} aria-hidden="true" />
+                    {report.postType === "need" ? t("markResolved") : t("closePost")}
+                  </button>
+                )}
+                <button
+                  className="button button--danger"
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setConfirmingDelete(true)}
+                >
+                  <Trash2 size={17} aria-hidden="true" />
+                  {t("deletePost")}
                 </button>
-              ) : (
-                <button className="button button--primary" type="button" disabled={submitting} onClick={() => changeStatus("resolved")}>
-                  <CheckCircle2 size={18} aria-hidden="true" />
-                  {report.postType === "need" ? t("markResolved") : t("closePost")}
-                </button>
-              )
+              </>
             ) : (
               <>
                 {report.postType === "need" && !isAuthor ? (
@@ -505,6 +531,33 @@ export function ReportModal({
               </>
             )}
           </div>
+          {canModerate && confirmingDelete ? (
+            <div className="delete-confirmation" role="alert">
+              <div>
+                <strong>{t("deletePostConfirmTitle")}</strong>
+                <p>{t("deletePostWarning")}</p>
+              </div>
+              <div>
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setConfirmingDelete(false)}
+                >
+                  {t("cancel")}
+                </button>
+                <button
+                  className="button button--danger"
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => void deleteReport()}
+                >
+                  <Trash2 size={17} aria-hidden="true" />
+                  {t("deletePermanently")}
+                </button>
+              </div>
+            </div>
+          ) : null}
           {!isAuthor && !canModerate ? (
             <button
               className="flag-button"

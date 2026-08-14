@@ -88,6 +88,18 @@ function userPayload(user: Awaited<ReturnType<typeof getSessionUser>>) {
   return user ? { user } : { user: null };
 }
 
+async function requireModerator(env: Env, request: Request) {
+  const user = await requireUser(env, request);
+  if (user.role !== "moderator") {
+    throw new HttpError(
+      403,
+      "moderator_required",
+      "Solo la persona moderadora de Pulso puede administrar publicaciones."
+    );
+  }
+  return user;
+}
+
 async function register(env: Env, request: Request): Promise<Response> {
   const body = await readJson<RegisterBody>(request);
   await verifyTurnstile(env, request, body.turnstileToken, "register");
@@ -341,14 +353,7 @@ async function updateReport(
   request: Request,
   reportId: string
 ): Promise<Response> {
-  const user = await requireUser(env, request);
-  if (user.role !== "moderator") {
-    throw new HttpError(
-      403,
-      "moderator_required",
-      "Solo la persona moderadora de Pulso puede cerrar publicaciones."
-    );
-  }
+  await requireModerator(env, request);
   const body = await readJson<{ status?: unknown }>(request);
   const status = enumValue(body.status, ["open", "resolved"] as const, "El estado");
   const result = await env.DB.prepare(
@@ -361,6 +366,22 @@ async function updateReport(
   }
   await invalidateReportCache();
   return json({ ok: true });
+}
+
+async function deleteReport(
+  env: Env,
+  request: Request,
+  reportId: string
+): Promise<Response> {
+  await requireModerator(env, request);
+  const result = await env.DB.prepare("DELETE FROM reports WHERE id = ?")
+    .bind(reportId)
+    .run();
+  if (!result.meta.changes) {
+    throw new HttpError(404, "report_not_found", "No se encontró el reporte.");
+  }
+  await invalidateReportCache();
+  return json({ ok: true }, { headers: { "cache-control": "no-store" } });
 }
 
 async function confirmReport(
@@ -845,6 +866,7 @@ async function handleApi(env: Env, request: Request): Promise<Response> {
 
   const reportId = routeId(pathname, "/api/reports/");
   if (method === "PATCH" && reportId) return updateReport(env, request, reportId);
+  if (method === "DELETE" && reportId) return deleteReport(env, request, reportId);
   const confirmId = routeId(pathname, "/api/reports/", "/confirm");
   if (method === "POST" && confirmId) return confirmReport(env, request, confirmId);
   const flagId = routeId(pathname, "/api/reports/", "/flag");

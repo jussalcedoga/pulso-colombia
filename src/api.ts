@@ -102,6 +102,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ status })
     }),
+  deleteReport: (id: string) =>
+    request<{ ok: boolean }>(`/api/reports/${encodeURIComponent(id)}`, {
+      method: "DELETE"
+    }),
   confirmReport: (id: string) =>
     request<{ ok: boolean; changed: boolean }>(
       `/api/reports/${encodeURIComponent(id)}/confirm`,

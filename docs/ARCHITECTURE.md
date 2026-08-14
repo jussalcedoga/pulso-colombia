@@ -51,12 +51,17 @@ Public posts have one of three explicit types:
 Signed-in users can send a private connection request to a post author. The
 recipient must accept it before either participant can use the lightweight
 private chat. Open chat views request only messages newer than the latest local
-message every 15 seconds. Inbox and chat responses are always `no-store`.
+message every 15 seconds and immediately when the browser regains focus.
+Opening the inbox always requests a fresh `no-store` response. Recovery codes
+identify accounts across devices; equal display names do not share an inbox.
+The moderator cannot read a conversation unless that account is a participant.
 
 Every visible post also has a public text discussion. Anyone may read it;
 posting requires an account. Resolved posts and their discussions leave public
 APIs. Only the single operator-assigned `moderator` account may resolve or
-reopen a post; post authors cannot change closure state.
+reopen a post, or permanently delete it; post authors cannot change closure
+state. A permanent delete cascades to the post's public comments, confirmations,
+flags, private connections, and chat messages.
 
 Available-help posts explicitly distinguish local and remote support. Local
 help stores and displays an approximate pin. Remote help is associated with a

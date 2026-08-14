@@ -29,6 +29,10 @@ Complete this before sharing beyond a small community pilot.
 - Confirm API responses carry CSP, frame, referrer, and MIME headers.
 - Test public phone/email rejection.
 - Test flag submission and operator review queries.
+- Confirm residents cannot close or delete posts.
+- Confirm the sole moderator can close and permanently delete a disposable post.
+- Restore one account on two devices with the same recovery code and verify the
+  inbox refreshes on open and browser focus.
 - Test edge rate limits and each endpoint-specific D1 rate limit.
 - Confirm Turnstile blocks a missing or invalid token when it is enabled.
 - Verify representative identity through an authority before setting `verified=1`.

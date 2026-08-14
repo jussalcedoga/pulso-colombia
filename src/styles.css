@@ -258,6 +258,19 @@ p {
   border-radius: 5px;
 }
 
+.header-action--inbox {
+  display: inline-flex;
+  width: auto;
+  min-width: 36px;
+  padding: 0 10px;
+}
+
+.header-action__label {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 720;
+}
+
 .notification-count {
   position: absolute;
   top: -5px;
@@ -2306,6 +2319,43 @@ p {
   gap: 8px;
 }
 
+.delete-confirmation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 10px;
+  padding: 11px 12px;
+  background: var(--danger-soft);
+  border: 1px solid #efc4c9;
+  border-radius: 5px;
+}
+
+.delete-confirmation strong {
+  color: var(--danger-dark);
+  font-size: 11px;
+}
+
+.delete-confirmation p {
+  max-width: 430px;
+  margin: 3px 0 0;
+  color: #6e4247;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.delete-confirmation > div:last-child {
+  display: flex;
+  flex: none;
+  gap: 7px;
+}
+
+.delete-confirmation .button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
 .report-comments {
   margin: 16px 0;
   padding-top: 14px;
@@ -2515,6 +2565,57 @@ p {
 .inbox-list {
   margin: 0 -20px;
   border-top: 1px solid var(--line);
+}
+
+.inbox-account {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 5px;
+}
+
+.inbox-account > svg {
+  color: var(--give);
+}
+
+.inbox-account > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.inbox-account strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-account small,
+.inbox-device-note {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.inbox-account small {
+  margin-top: 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.inbox-refresh {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
+.inbox-refresh svg {
+  margin-right: 6px;
+}
+
+.inbox-device-note {
+  margin: 0 0 14px 29px;
+  line-height: 1.45;
 }
 
 .offer-entry {
@@ -3529,7 +3630,8 @@ p {
 
   .brand__tagline,
   .event-status,
-  .account-button span {
+  .account-button span,
+  .header-action__label {
     display: none;
   }
 
@@ -3538,6 +3640,11 @@ p {
   }
 
   .account-button {
+    width: 36px;
+    padding: 0;
+  }
+
+  .header-action--inbox {
     width: 36px;
     padding: 0;
   }
@@ -3789,15 +3896,35 @@ p {
 
   .report-detail__actions,
   .form-actions,
-  .offer-entry__actions {
+  .offer-entry__actions,
+  .delete-confirmation {
     align-items: stretch;
     flex-direction: column-reverse;
   }
 
   .report-detail__actions .button,
   .form-actions .button,
-  .offer-entry__actions .button {
+  .offer-entry__actions .button,
+  .delete-confirmation .button {
     width: 100%;
+  }
+
+  .delete-confirmation > div:last-child {
+    width: 100%;
+    flex-direction: column-reverse;
+  }
+
+  .inbox-account {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+
+  .inbox-refresh {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .inbox-device-note {
+    margin-left: 0;
   }
 
   .inbox-list {

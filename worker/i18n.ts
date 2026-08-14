@@ -21,7 +21,7 @@ const englishErrors: Record<string, string> = {
     "The location must be inside the selected city or region.",
   invalid_recovery_code: "The access code is invalid.",
   message_not_saved: "The message could not be saved.",
-  moderator_required: "Only the Pulso moderator can close community posts.",
+  moderator_required: "Only the Pulso moderator can manage community posts.",
   not_allowed: "You are not allowed to perform this action.",
   not_found: "Route not found.",
   offer_closed: "This connection request has already been updated.",

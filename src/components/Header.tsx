@@ -75,13 +75,14 @@ export function Header({
           </a>
           {user ? (
             <button
-              className="header-action"
+              className="header-action header-action--inbox"
               type="button"
               onClick={onInbox}
               aria-label={inboxCount ? t("messagesCount", { count: inboxCount }) : t("inbox")}
               title={t("inbox")}
             >
               <Mail size={19} aria-hidden="true" />
+              <span className="header-action__label">{t("inbox")}</span>
               {inboxCount > 0 ? <span className="notification-count">{Math.min(99, inboxCount)}</span> : null}
             </button>
           ) : null}

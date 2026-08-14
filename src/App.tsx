@@ -1,6 +1,6 @@
 import { CloudOff, RefreshCw, Wifi } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "./api";
+import { api, ApiRequestError } from "./api";
 import { createTranslator, detectLanguage } from "./i18n";
 import { rankLocalAreas } from "./scoring";
 import type {
@@ -47,6 +47,8 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
+  const [inboxLoading, setInboxLoading] = useState(false);
+  const [inboxError, setInboxError] = useState("");
   const [selectedCity, setSelectedCity] = useState<CityId>("manizales");
   const [selectedNeed, setSelectedNeed] = useState<NeedType | "all">("all");
   const [selectedPostType, setSelectedPostType] = useState<PostType | "all">("all");
@@ -77,14 +79,22 @@ export default function App() {
     setLoading(false);
   }, []);
 
-  const loadInbox = useCallback(async () => {
+  const loadInbox = useCallback(async (showLoading = false) => {
+    if (showLoading) setInboxLoading(true);
+    setInboxError("");
     try {
       const result = await api.inbox();
       setOffers(result.offers);
-    } catch {
-      // Authentication can expire independently; /api/me refresh handles that on reload.
+      return true;
+    } catch (caught) {
+      setInboxError(
+        caught instanceof ApiRequestError ? caught.message : t("inboxLoadError")
+      );
+      return false;
+    } finally {
+      if (showLoading) setInboxLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void Promise.all([
@@ -171,6 +181,10 @@ export default function App() {
 
   const openNeed = () => openPost("need");
   const openAvailableHelp = () => openPost("offer");
+  const openInbox = () => {
+    setActiveModal("inbox");
+    void loadInbox(true);
+  };
 
   const handleAuthSuccess = (nextUser: User, code?: string) => {
     setUser(nextUser);
@@ -225,7 +239,7 @@ export default function App() {
         onLanguageChange={changeLanguage}
         onAuth={() => setActiveModal("auth")}
         onLogout={() => void logout()}
-        onInbox={() => setActiveModal("inbox")}
+        onInbox={openInbox}
       />
       {!online ? (
         <div className="connection-banner connection-banner--offline" role="status">
@@ -359,7 +373,11 @@ export default function App() {
           <InboxModal
             t={t}
             language={language}
+            user={user}
             offers={offers}
+            loading={inboxLoading}
+            loadError={inboxError}
+            onRefresh={() => void loadInbox(true)}
             onClose={() => setActiveModal(null)}
             onChanged={(message) => void refreshAfterChange(message, false)}
           />

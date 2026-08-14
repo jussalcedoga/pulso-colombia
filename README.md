@@ -59,7 +59,8 @@ posts, and separate **Necesito ayuda / I need help** and
   offers, accept/decline them, and chat after an offer is accepted.
 - Gives every need, available-help post, and community update a lightweight
   public discussion. Only the single operator-assigned moderator can close or
-  reopen posts; resolved posts leave the public feed.
+  reopen posts, or permanently delete test/unsafe posts; resolved posts leave
+  the public feed.
 - Links only to configured official organization domains. Pulso does not process
   money or charge fees.
 - Runs as a Cloudflare Worker with static assets and D1 on the free tier.
@@ -186,6 +187,12 @@ npx wrangler d1 execute pulso-colombia --remote \
 
 Keep the moderator recovery code private. Resolved posts and their public
 discussions leave public APIs and expire under the normal retention policy.
+Permanent deletion also removes that post's comments, connections, and chat.
+
+Use the same moderator recovery code with **I already have a code** on every
+device. Creating another account, even with the same display name, creates a
+separate identity and private inbox. Moderators cannot inspect private
+conversations unless their account is one of the two participants.
 
 ## Privacy And Abuse Controls
 

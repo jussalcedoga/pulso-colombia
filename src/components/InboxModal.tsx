@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Send,
   ShieldAlert,
+  UserRound,
   X
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -15,14 +16,25 @@ import { api, ApiRequestError } from "../api";
 import { CITIES } from "../data";
 import { formatRelativeTime } from "../format";
 import type { TFunction } from "../i18n";
-import type { ChatMessage, Language, Offer, OfferStatus, OfferType } from "../types";
+import type {
+  ChatMessage,
+  Language,
+  Offer,
+  OfferStatus,
+  OfferType,
+  User
+} from "../types";
 import { Modal } from "./Modal";
 import { OfferIcon } from "./NeedIcon";
 
 interface InboxModalProps {
   t: TFunction;
   language: Language;
+  user: User;
   offers: Offer[];
+  loading: boolean;
+  loadError: string;
+  onRefresh: () => void;
   onClose: () => void;
   onChanged: (message: string) => void;
 }
@@ -54,7 +66,11 @@ function statusLabel(status: OfferStatus, t: TFunction): string {
 export function InboxModal({
   t,
   language,
+  user,
   offers,
+  loading,
+  loadError,
+  onRefresh,
   onClose,
   onChanged
 }: InboxModalProps) {
@@ -105,10 +121,19 @@ export function InboxModal({
   useEffect(() => {
     if (!chatOfferId) return;
     void loadChat(chatOfferId);
+    const refreshVisibleChat = () => {
+      if (document.visibilityState === "visible") void loadChat(chatOfferId, true);
+    };
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void loadChat(chatOfferId, true);
     }, 15_000);
-    return () => window.clearInterval(timer);
+    document.addEventListener("visibilitychange", refreshVisibleChat);
+    window.addEventListener("focus", refreshVisibleChat);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshVisibleChat);
+      window.removeEventListener("focus", refreshVisibleChat);
+    };
   }, [chatOfferId, loadChat]);
 
   const sendMessage = async (event: FormEvent, offerId: string) => {
@@ -150,6 +175,31 @@ export function InboxModal({
 
   return (
     <Modal title={t("inboxTitle")} t={t} onClose={onClose} size="large">
+      <div className="inbox-account">
+        <UserRound size={20} aria-hidden="true" />
+        <span>
+          <strong>{t("inboxSignedInAs", { name: user.displayName })}</strong>
+          <small>
+            {t("inboxAccountHint", {
+              id: user.id.slice(-6).toUpperCase()
+            })}
+          </small>
+        </span>
+        <button
+          className="button button--secondary inbox-refresh"
+          type="button"
+          disabled={loading}
+          onClick={onRefresh}
+        >
+          <RefreshCw
+            className={loading ? "spin-icon" : undefined}
+            size={16}
+            aria-hidden="true"
+          />
+          {loading ? t("refreshingInbox") : t("refreshInbox")}
+        </button>
+      </div>
+      <p className="inbox-device-note">{t("inboxDeviceHint")}</p>
       <div className="segmented-control">
         <button
           type="button"
@@ -170,6 +220,7 @@ export function InboxModal({
           <span>{offers.filter((offer) => offer.direction === "sent").length}</span>
         </button>
       </div>
+      {loadError ? <div className="form-error" role="alert">{loadError}</div> : null}
       {error ? <div className="form-error" role="alert">{error}</div> : null}
       <div className="inbox-list">
         {visibleOffers.length ? (
